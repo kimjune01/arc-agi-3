@@ -16,6 +16,7 @@ Perception & intent (Layer 1):
 | `uv run arcg click <x> <y>` | act at a coordinate, 0-63 (ACTION6) |
 | `uv run arcg undo` | undo the last action (ACTION7) |
 | `uv run arcg diff` | the delta since your last action |
+| `uv run arcg objects` | connected-component objects (avatar, walls, tokens); FREE |
 
 State & determinism (Layer 2) — the game is deterministic after RESET:
 | command | what it does |

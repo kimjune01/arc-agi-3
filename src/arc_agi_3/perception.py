@@ -65,6 +65,102 @@ def diff_grids(prev: np.ndarray, cur: np.ndarray) -> Delta:
     return Delta(changed=int(mask.sum()), cells=cells, bbox=_bbox(mask))
 
 
+# --- objects (spatial edge detection) ------------------------------------
+# Segment a frame into connected same-colour regions. This is the figure/ground
+# primitive: it names the discrete things on the board (avatar, walls, tokens)
+# so a policy can talk about "the 12-block" instead of raw cells. Background —
+# the modal colour — is excluded by default since it's the ground, not a figure.
+
+_NBRS4 = ((-1, 0), (1, 0), (0, -1), (0, 1))
+_NBRS8 = _NBRS4 + ((-1, -1), (-1, 1), (1, -1), (1, 1))
+
+
+@dataclass
+class GridObject:
+    color: int
+    cells: int
+    bbox: tuple[int, int, int, int]  # y0, x0, y1, x1
+
+    @property
+    def size(self) -> tuple[int, int]:
+        y0, x0, y1, x1 = self.bbox
+        return (y1 - y0 + 1, x1 - x0 + 1)
+
+
+def _modal_color(arr: np.ndarray) -> int:
+    values, counts = np.unique(arr, return_counts=True)
+    return int(values[int(np.argmax(counts))])
+
+
+def find_objects(grid: list[list[int]] | np.ndarray, *, background: int | None = None,
+                 connectivity: int = 4) -> tuple[list[GridObject], int | None]:
+    """Connected-component segmentation. Returns (objects, background_colour).
+
+    Same-colour cells touching (4- or 8-connected) form one object. `background`
+    defaults to the modal colour; pass an absent value (e.g. -1) to keep every
+    colour. Deterministic: scan order fixes the object order (top-left first).
+    """
+    arr = np.asarray(grid, dtype=np.int16)
+    if arr.size == 0:
+        return [], None
+    if background is None:
+        background = _modal_color(arr)
+    nbrs = _NBRS8 if connectivity == 8 else _NBRS4
+    h, w = arr.shape
+    seen = np.zeros(arr.shape, dtype=bool)
+    objects: list[GridObject] = []
+    for sy in range(h):
+        for sx in range(w):
+            if seen[sy, sx]:
+                continue
+            seen[sy, sx] = True
+            color = int(arr[sy, sx])
+            if color == background:
+                continue
+            stack = [(sy, sx)]
+            y0 = y1 = sy
+            x0 = x1 = sx
+            count = 0
+            while stack:
+                cy, cx = stack.pop()
+                count += 1
+                y0, y1 = min(y0, cy), max(y1, cy)
+                x0, x1 = min(x0, cx), max(x1, cx)
+                for dy, dx in nbrs:
+                    ny, nx = cy + dy, cx + dx
+                    if 0 <= ny < h and 0 <= nx < w and not seen[ny, nx] and int(arr[ny, nx]) == color:
+                        seen[ny, nx] = True
+                        stack.append((ny, nx))
+            objects.append(GridObject(color=color, cells=count, bbox=(y0, x0, y1, x1)))
+    return objects, background
+
+
+def describe_objects(objects: list[GridObject], background: int | None, *,
+                     max_items: int = 40) -> str:
+    """Render objects grouped by colour, largest first, magnitude-honest."""
+    if not objects:
+        return f"no objects (background colour {background} fills the frame)"
+    by_color: dict[int, list[GridObject]] = {}
+    for o in objects:
+        by_color.setdefault(o.color, []).append(o)
+    head = (f"{len(objects)} objects across {len(by_color)} colours "
+            f"(background {background} excluded):")
+    lines = [head]
+    shown = 0
+    for color in sorted(by_color, key=lambda c: -sum(o.cells for o in by_color[c])):
+        group = sorted(by_color[color], key=lambda o: -o.cells)
+        lines.append(f"  colour {color}: {len(group)} object(s)")
+        for o in group:
+            if shown >= max_items:
+                lines.append(f"  ...(+{len(objects) - shown} more objects)")
+                return "\n".join(lines)
+            y0, x0, y1, x1 = o.bbox
+            h, w = o.size
+            lines.append(f"    rows {y0}-{y1} cols {x0}-{x1} ({h}x{w}, {o.cells} cells)")
+            shown += 1
+    return "\n".join(lines)
+
+
 @dataclass
 class Observation:
     step: int

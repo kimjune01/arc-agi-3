@@ -2,7 +2,13 @@
 
 import numpy as np
 
-from arc_agi_3.perception import Perception, diff_grids, render_grid
+from arc_agi_3.perception import (
+    Perception,
+    describe_objects,
+    diff_grids,
+    find_objects,
+    render_grid,
+)
 from arc_agi_3.structs import FrameData, GameState
 
 
@@ -45,3 +51,42 @@ def test_palette_counts():
     p = Perception()
     o = p.observe(_frame([[0, 0, 3], [3, 3, 0]]))
     assert o.palette == {0: 3, 3: 3}
+
+
+def test_find_objects_separates_components_and_excludes_background():
+    # 0 is the modal colour (background); two separate 5-regions remain.
+    grid = [
+        [0, 0, 0, 0],
+        [0, 5, 0, 5],
+        [0, 5, 0, 0],
+        [0, 0, 0, 0],
+    ]
+    objs, bg = find_objects(grid)
+    assert bg == 0
+    assert len(objs) == 2
+    big, small = sorted(objs, key=lambda o: -o.cells)
+    assert big.color == 5 and big.cells == 2 and big.bbox == (1, 1, 2, 1)
+    assert small.cells == 1 and small.bbox == (1, 3, 1, 3)
+
+
+def test_find_objects_connectivity_merges_diagonals():
+    grid = [[5, 0], [0, 5]]  # two 5-cells touching only at a diagonal
+    four, _ = find_objects(grid, background=0, connectivity=4)
+    eight, _ = find_objects(grid, background=0, connectivity=8)
+    assert len(four) == 2  # diagonal touch doesn't connect under 4-connectivity
+    assert len(eight) == 1 and eight[0].cells == 2
+
+
+def test_find_objects_with_bg_keeps_every_colour():
+    grid = [[0, 0], [0, 5]]
+    objs, _ = find_objects(grid, background=-1)
+    assert {o.color for o in objs} == {0, 5}
+
+
+def test_describe_objects_empty_and_grouped():
+    assert "no objects" in describe_objects([], 0)
+    grid = [[0, 5, 0, 7], [0, 5, 0, 0]]
+    objs, bg = find_objects(grid)
+    out = describe_objects(objs, bg)
+    assert "background 0 excluded" in out
+    assert "colour 5" in out and "colour 7" in out

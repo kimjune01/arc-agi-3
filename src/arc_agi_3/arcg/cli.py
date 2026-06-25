@@ -52,6 +52,13 @@ def build_parser() -> argparse.ArgumentParser:
     add("look", lambda a: l1.look(no_grid=a.no_grid), "render current observation",
         [("--no-grid", {"action": "store_true"})])
     add("diff", lambda a: l1.diff(), "delta since last action")
+    add("objects", lambda a: l1.objects(with_bg=a.with_bg,
+                                        connectivity=8 if a.diag else 4),
+        "connected-component objects (spatial edges) in the current frame",
+        [("--with-bg", {"action": "store_true",
+          "help": "include the background (modal) colour"}),
+         ("--diag", {"action": "store_true",
+          "help": "8-connectivity (count diagonals as touching)"})])
 
     # Layer 2 — state & determinism
     add("history", lambda a: l2.history(), "action sequence + budget + snapshots")

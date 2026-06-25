@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..perception import diff_grids, render_grid
+from ..perception import describe_objects, diff_grids, find_objects, render_grid
 from ..session import Session
 from . import layer0_protocol, store
 
@@ -75,3 +75,16 @@ def diff() -> str:
         return "no prior frame to diff against."
     d = diff_grids(np.asarray(sess.prev_grid, np.int16), np.asarray(sess.grid, np.int16))
     return d.describe(max_cells=40)
+
+
+def objects(*, with_bg: bool = False, connectivity: int = 4) -> str:
+    """Connected-component objects in the current frame (figure/ground). Free."""
+    sess = store.load()
+    if not sess.grid:
+        return "no frame yet; `arcg look` after an action."
+    # with_bg keeps every colour: -1 is absent from the 0-15 palette, so nothing
+    # is treated as background.
+    objs, bg = find_objects(np.asarray(sess.grid, np.int16),
+                            background=-1 if with_bg else None,
+                            connectivity=connectivity)
+    return describe_objects(objs, bg)
