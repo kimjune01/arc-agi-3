@@ -150,6 +150,528 @@ Also confirmed live: `move left` = ACTION3 slides the 12-block left; budget mete
 increments (1/15...5/15); `restore` cost 3 budget (reset+2 replays), reported;
 `peek` spends 0 budget (cache-only); terminated cleanly under cap via `end`.
 
+## 2026-06-25
+
+### Upper layers named via the cognitive-architecture memory typology
+
+Read `action-dag.md` and the Hypothesis Graph paper (june.kim). They are the two
+upper floors of the stack, and the CoALA/Soar memory typology fixes their order:
+
+- **Layer 2** already holds **working memory** (live session) + **episodic
+  memory** (action trace + replay/restore). The determinism we measured is its
+  replay substrate.
+- **Layer 3 = pmem (procedural memory) = Action DAG.** Compiled goal→action
+  decompositions: embedding filter (intent → subtree) over an HTN cache, LLM as
+  JIT compiler on miss, write-back on success (= Soar chunking, the paper's own
+  framing). Replaces the stopgap `note`/`notes` scratchpad — freeform notes get
+  typed into pmem (how) and smem (what).
+- **Layer 4 = smem (semantic memory) = hypothesis graph.** Falsifiable claims
+  about game mechanics ("12-block=avatar", "ACTION3=left"), each a typed node
+  bound to a trial, kill-condition edges, replay invariant. Runs trials via L2
+  (snapshot/restore) + L1 (delta = the bi-abductive figure/ground diff we already
+  built as `diff_grids`).
+
+**Dependency subtlety, resolved (keeps the downward-only discipline):** pmem sits
+below smem despite planning seeming to need mechanics-knowledge. No circularity,
+because pmem-the-data-structure does NOT import smem. The Action DAG is a passive
+filter+cache validated by the *environment oracle* (did the sequence work?), not
+by querying smem. The semantic knowledge that informs a decomposition enters as
+prompt context when the policy (top of stack) fires the JIT on a cache miss —
+top-down injection, never an L3→L4 code edge. Both pmem and smem are graded by
+the game, the un-authorable external oracle (the hygraph paper's active
+ingredient — here it's free, the environment supplies every verdict).
+
+### Collapse: old L1 (intent+perception) and L2 (state/determinism) merge
+
+Perception, intent, and snapshot/restore are one concern — the agent playing and
+tracking the game in game-terms; the determinism/replay is part of *how you
+interact*, not a separate layer. So they collapse into one **intent** layer.
+
+**Final 4-layer stack:**
+```
+0  wrapper   raw API verbs (only importer of ArcClient)
+1  intent    move/interact/click/undo/look/diff + snapshot/restore/peek/history
+             + budget meter  (working + episodic memory + the replay substrate)
+2  pmem      Action DAG — compiled goal→action decompositions (procedural)
+3  smem      hypothesis graph — falsifiable mechanic-claims (semantic)
+```
+Split is interaction substrate (0,1) under memory (2,3). Policy sits at the top.
+Reach all downward/triangular: smem → intent + pmem; pmem → intent.
+Code refactor (rename `layer0_protocol`→`layer0_wrapper`; fold `layer2_state` +
+`layer3_memory` into `layer1_intent`) is PENDING — held while the architecture
+keeps landing; v1 stays committed and green meanwhile.
+
+### Two loops + the inquiry loop (methodeutics grounding)
+
+The memory layers are stores; two processes move information between them, and
+they're decoupled so the code stays a downward DAG even though the data flow is a
+cycle.
+
+- **Execution loop** (sync, fast): policy → pmem (cached skill) → intent (act) →
+  wrapper (API). Each action pushes an episodic event.
+- **Learning loop** (async, pull-based): an agent *fetches* epmem and cascades
+  updates upward — **epmem → smem → pmem**. Episodic experience generalizes into
+  semantic mechanic-claims (the inquiry loop), which compile into procedural
+  skills (Soar chunking).
+- **Cycle:** epmem → smem → pmem → action → epmem. Circular in data flow.
+- **Cycle-breaker:** the `action → epmem` edge is **async** (fire-and-forget into
+  an append-only episodic buffer; the learning agent fetches from it). Producers
+  never sync-call consumers, so no upward import, no recursion. Event-sourced /
+  blackboard decoupling; matches the hypothesis graph's append-only nature.
+
+**epmem = episodic memory** (the action/perturbation trace + replay) lives in the
+intent layer; smem reads it.
+
+**The inquiry loop (the epmem→smem step) is methodeutics.** Read ch07 Origin of
+Inquiry: the diff can't choose its own basis — *the goal frames the basis*
+(purpose selects what to observe before any diff runs; the mechanic's six gauges
+came from what she was fixing, not from the diff). Consequences for us:
+- **pmem hands the perception basis down to intent.** The nested goal stack
+  (win → complete level → learn mechanic → perturb+diff) sets, at each rung, the
+  basis the rung below observes. ch07 maps this nesting onto HTN→Soar and links
+  the Action DAG directly. So pmem→intent (downward): the goal selects which slice
+  of the 64×64 grid is figure.
+- The inquiry loop across methodeutics: ch04 diff / ch05 bi-abduction (the
+  figure/ground primitive = our `diff_grids`), ch07 origin (goal frames basis),
+  ch08 economy of research (which perturbation to spend budget on = our RHAE
+  budget meter), ch09-11 trajectory / four-bins / kill-conditions (classify the
+  response, generate the edge). That loop, run over epmem, writes smem.
+- ch07's standing warning: a sharp frame is a sharp blindness. The goal that makes
+  perception finite also makes it partial — the agent won't see what its current
+  goal framed out. Worth remembering when a mechanic hypothesis stalls.
+
+### Goal formation — the hard, ARC-AGI-3-specific problem
+
+Read ch01 (the three-mode loop), ch07 (goal frames basis), ch08 (economy of
+research). The loop (ch01) fires on a surprise; surprise needs a goal-framed basis
+(ch07); ch07 dissolves cold-start with "a live purpose one rung down." **ARC-AGI-3
+is the pathological case: no rung below the top goal.** You get only
+`levels_completed up / WIN` and must INVENT the intermediate goals (avatar, exit,
+what scores). That's ch07's basis *invention* (generation, not selection) — the
+part no tradition gets for free.
+
+**Reframe: two oracles, both free from the environment, very different rates.**
+- *Mechanics* (smem node-type): "ACTION3 moves the 12-block left." Oracle = the
+  **delta**. Dense (every action), cheap. Learns GOAL-FREE via undirected
+  curiosity / prediction-error (ch07 reorganization). We already saw ACTION3=left
+  fall out of the delta with no objective in hand.
+- *Goals* (smem node-type): "objective = block onto the 9-token." Oracle = the
+  **score / WIN**. Sparse (~once per level), expensive. Starved until the FIRST
+  level-up; goal formation is one-shot abduction from the episodic trace of that
+  first success ("what controllable config preceded the score tick?"). Before
+  that, only curiosity.
+
+**The crusher (ch08 under RHAE).** Goal abduction needs score events; score events
+cost many actions; actions are the budgeted resource RHAE scores. So the
+exploration that finds the goal tanks the efficiency it's graded on. ch08 is the
+only move: every action a crucial experiment (Platt), max info-gain/cost
+(GDE/Peirce), multiple working hypotheses (Chamberlin) so each step eliminates the
+most. Economy of research is survival here, not polish — the budget IS the score.
+
+**Architecture:** goals = smem node-type on the slow (score) oracle; mechanics =
+smem node-type on the fast (delta) oracle. Witnessed goals compile smem→pmem into
+the goal stack (ch07 nesting / HTN), which frames the basis intent perceives
+against. Open goal-hypotheses stay in smem; the policy picks which to pursue by
+economy-of-research. Goal formation rides the same epmem→smem→pmem cascade, just
+on the slow oracle.
+
+### The game model — placement (breaks the budget crusher)
+
+We need to perturb a MODEL (simulate) instead of the real game, because real
+actions cost RHAE. Decision: **the game model is smem read forward — not a new
+store.** Witnessed mechanic-claims ARE a transition function ("ACTION3 → block
+left"); simulating = applying them to a state to predict the next. Keeps it
+auditable (every prediction traces to claims with replayable trials); a separate
+learned simulator would be the opaque blob the hygraph paper argues against.
+
+**Three modes (ch01) map onto model-vs-real, which sites the budget:**
+- *abduction* — propose a mechanic from a real surprise.
+- *deduction* — simulate the model (smem forward) → predicted next-state. FREE.
+- *induction* — spend a real action to test the prediction. COSTS RHAE.
+So most inquiry runs in free deduction (model rollouts); spend a real action only
+where deduction is uncertain or confirmation is crucial — exactly what ch08 ranks
+(max info-gain/action, measured against what the model already predicts). The
+model converts "every experiment costs budget" into "spend induction only where
+deduction is unsure."
+
+**Two-tier model:** Layer 2 determinism cache (exact memo of VISITED sequences,
+free, ground-truth) under Layer 3 smem (generalizing simulator for NOVEL states,
+free, approximate). Cache hit → exact; miss → predict. The determinism work is the
+model's ground-truth anchor.
+
+**Imagined rollouts stay transient** (policy scratch), NOT written to epmem —
+epmem stays the ground-truth replayable record (replay invariant: only real trials
+are nodes). Simulated experience is deduction; it proposes candidates, but a claim
+is witnessed only by a real-game induction. Real actions do double duty: progress
++ model validation (prediction vs real delta = kill/witness; a misprediction is a
+surprise → abduction → refine smem → refine model).
+
+### Imagination vs reality = the surprise engine
+
+Comparing the model's prediction (imagination) against the real outcome (reality)
+GENERATES the surprises that fire abduction (ch01). This is the hygraph paper's
+active ingredient made concrete: model = what the agent believes, game = what is
+true, **XOR(predicted, actual) = surprise = abductive trigger.** The model can't
+author its own surprises (self-consistent → no surprise); the surprise must come
+from reality, the un-authorable oracle — which is why abduction is the necessary
+EXTERNAL operation.
+
+- **Model as surprise-filter (the economy).** Abduce only on mismatch; a matched
+  prediction just WITNESSES (raises credence on the claims it used, no new node).
+  The agent thinks hard only when reality violates its model — expected outcomes
+  suppressed as noise, surprises surfaced as figure. Cheap under RHAE.
+- **Two basis-providers, both placed.** Goal (pmem) frames RELEVANCE (what to look
+  at, ch07); model (smem) frames EXPECTATION (what to predict). Surprise =
+  relevant ∩ unexpected: the goal picks the variables, the model picks the
+  surprising values among them.
+- **Determinism makes every surprise clean signal.** Because the game is
+  deterministic (measured on LS20), predicted ≠ actual means the model is WRONG,
+  never noise. Every surprise is a real model error worth abducing on. This is why
+  the determinism measurement was foundational: it makes prediction-error
+  noise-free.
+- **Economy of research, sharpened (ch08):** spend a real (induction) action where
+  you most EXPECT a surprise — where the model is least confident. Confirmed
+  predictions waste budget; mismatches are maximally informative. Uncertainty
+  sampling, with the model supplying the uncertainty.
+
+### The XOR engine: methodeutics primitives + the abductor, ported
+
+Read the primitive progression (ch04 diff / ch05 bi-abduction / ch06 tri-abduction)
+and mapped the abductor tool (documents/abductor) to rebuild a version for the game.
+
+**Primitive progression → game:**
+- *unary diff* (ch04): before/after → figure/ground. = our `diff_grids` (figure =
+  moving object, ground = static board).
+- *bi-abduction* (ch05): infer footprint + frame + precondition WITHOUT choosing
+  the snapshot. Frame rule → learn an action's effect locally on the object it
+  touches; it composes anywhere on the board (object-centric, compositional
+  mechanics). Also infers the precondition ("needs empty space left").
+- *tri-abduction* (ch06): shared start + two perturbations → causal edge (Mill's
+  method of difference). = controlled experiment for CONDITIONAL mechanics
+  ("left UNLESS blocked"). **Payoff: determinism + snapshot/restore IS the
+  tri-abduction substrate** — same start guaranteed, clean causal edge, impossible
+  in a stochastic game. Layer 2 was the right first build.
+
+**What the abductor actually is** (src map): a set-reconciliation XOR engine +
+hypothesis graph.
+- core: `reconcile(a,b) → (a_only,b_only,decoded)` — symmetric difference of two
+  ACCEPT-SETS via an IBLT, O(d) in the difference size, without materializing
+  either set. The ch04 diff made cheap.
+- enumerate (fixpoint-closed case space) / calibrate (baseline accept-set from a
+  known-good oracle, once) / gate (`reconcile(believed, truth)` → fp/fn, exit 0
+  agree / 10 disagree).
+- diff-the-diff = checking analogue of tri-abduction (Zilberstein OSL 2024): two
+  oracles, directional, routes collapse_WIDE vs collapse_NARROW (the Verus
+  too-wide/too-narrow axis).
+- `HypothesisGraph`: abduce/kill/witness/from_kill/probe; `probe()` fuses
+  abduce→test→classify, returns counterexamples that name the next hypothesis.
+
+**Port to ARC-AGI-3 (nearly 1:1):** case space = (object, action, local-context)
+via bi-abduction footprints; candidate accept-set = the MODEL's predictions (smem
+forward, free); baseline = the real GAME; `reconcile(predicted, actual)` = the
+SURPRISES; agree→witness / disagree→kill+abduce; diff-the-diff = conditional
+refinement.
+
+**The one crucial adaptation:** the abductor's oracle is free+total (computes over
+all cases at init). OURS is live+expensive (each case = an RHAE action). So the
+baseline can't be materialized — replace "compute oracle over all cases" with:
+(1) FREE+partial: the determinism cache (visited pairs → true outcome via peek;
+reconcile over those is free); (2) EXPENSIVE+sampled: spend a real action only
+where ch08 says (model least confident = max expected surprise).
+
+**Elegant consequence:** IBLT cost = O(d), d = #surprises. As the model learns the
+surprise set shrinks, so the XOR engine gets cheaper exactly as the agent gets
+better; cache reconciles are free; budget is spent only to sample reality where
+the gate is uncertain.
+
+### epmem storage: whole + patches (the world is small)
+
+A frame is ~4KB (64x64) and logging is INTERNAL (free — only real actions cost
+budget), so store epmem BOTH ways, no tradeoff:
+- **whole** = full frame at a step. Exact, replayable, peekable; the snapshot/
+  restore + tri-abduction same-start substrate. = the determinism cache (wholes
+  keyed by sequence) — already built.
+- **patch** = the delta (figure from `diff_grids`). Tiny; the native unit of the
+  XOR engine (XOR(predicted_patch, actual_patch) = surprise) and of the cons
+  FILTER (keep surprising patches, drop syndrome-zero). Already built.
+Inter-convertible, exact under determinism:
+  whole_{t+1}=apply(whole_t,patch_t); patch_t=diff(whole_t,whole_{t+1});
+  whole_n=replay(whole_0,action_seq).
+This is compress-and-unfold's centers/edges split as a storage layout: wholes =
+centers (static, write-once, fixed points), patches = edges (live, generative).
+It's git for game states: wholes = checkouts, patches = commits; small world makes
+checkouts cheap enough to keep both. Consequence: **epmem can be EXHAUSTIVE** —
+log everything (whole, patch, prediction, surprise, score), decide what to keep at
+CONSOLIDATION time (where cons puts the decision), not at write time. Budget lives
+only at the inhale (real actions); the record is unlimited.
+
+### Temporal diffs = edge detection; the action is the operator
+
+Patches are edges in TIME the way Sobel/Canny are edges in SPACE; the ACTION is
+the operator that produces them. `diff_grids` = temporal edge detection (figure =
+edge, ground = flat). This answers the object-ontology question:
+- **spatial edges** (within a frame, region boundaries) → OBJECT PROPOSALS
+  (connected components).
+- **temporal edges** (across frames, action-driven) → MECHANICS.
+- they cross-validate: a spatial edge proposes a region; temporal co-movement
+  WITNESSES it ("these cells moved together → one object"). Objects are abduced
+  from spatial structure, witnessed by co-movement — abduce→witness one floor down,
+  the lowest tier of smem. (The 12-block: shared boundary AND moves as a unit.)
+
+**Structure-from-motion.** Vision recovers 3D structure from how things move across
+frames; the agent recovers the ENGINE's structure from how the grid moves across
+ACTIONS. The action is the controlled probe (like varying viewpoint/lighting).
+Tri-abduction = controlled structure-from-motion (same start, two probes, the
+divergence localizes the cause).
+
+**Edges are the compression; the surprise is an edge-of-edges.** Patches (temporal
+edges) are the information-dense unit; the flat ground is redundant — cons's filter
+= keep edges, drop flat (the exhale, as edge detection). The surprise =
+XOR(predicted edge map, actual edge map) = a SECOND-ORDER edge = the abductor's
+diff-the-diff; wide/narrow = predicted edge too big / too small.
+
+Perception stack reads as a vision pipeline, each stage the same `diff` primitive
+at higher arity (ch04→05→06): raw frame → spatial edges (objects) → temporal edges
+(mechanics) → structure-from-motion (engine) → second-order edges (surprises).
+
+### Undo = cheap branch; git as the epmem substrate
+
+**Undo (ACTION7) is the local-branch operator.** O(1) (1 action) vs reset+replay's
+O(N). For tri-abduction at the frontier ("same start, vary the last action"):
+`act A → undo → act B` = two siblings from one parent for one undo. Both cost
+budget (undo is a real action), but undo is the cheap local branch, reset+replay
+the arbitrary jump. The exploration tree is built mostly from undo.
+
+**Git as epmem substrate (fits deeply, easy to impl).** Git's object model IS the
+monotone write-once semilattice compress-and-unfold demanded:
+- immutable objects = write-once centers (the one axiom)
+- content-addressing = dedup = idempotent semilattice merge (same state via
+  different sequences → same tree hash, the diamond collapses for free)
+- `git diff` = patches (temporal edges); commits/trees = wholes (deduped)
+- branches = exploration tree (undo-branches); `git checkout` = free model-side
+  restore; tree-hash compare = exact free determinism check
+- Merkle DAG = provenance / replay
+Impl: temp/bare repo, one commit per step (frame blob, action in message). ~10ms/
+commit is nothing vs game-API + LLM latency (seconds). FREE WIN: inspectability —
+`git log` = action history, `git diff` = each temporal edge, `git branch` = the
+exploration tree. Watch the agent think by browsing the repo.
+
+**Two layers, two guarantees** (matches the hygraph paper's Portable-Agent-Memory
+vs hypothesis-graph contrast): git-epmem = INTEGRITY of the record (content-
+addressed, tamper-evident, what happened); smem = WARRANT of the knowledge
+(witnessed mechanics that survived trials, what's true). Model synthesized from the
+former, validated into the latter.
+
+### CORRECTION: each named structure is only the CACHE of its layer
+
+The data structures (git-epmem, hypothesis graph, Action DAG) are only the
+consolidate-RESIDUE of their layers. Each layer is a full **perceive → filter →
+attend → consolidate** cycle (the cons operator); the cache is what falls out the
+end. The stack is a tower of cons cycles, not a tower of stores.
+
+| layer | perceive | filter | attend (abductive leap) | consolidate → cache |
+|---|---|---|---|---|
+| wrapper | raw API frame | parse/validate | — | frame + cookies |
+| intent/epmem | frames | temporal diff: keep edges, drop ground & syndrome-zero | object co-movement; goal-framed salience | git-epmem (transposition table) |
+| smem/model | epmem surprises | drop model-explained | abduce mechanic; wide/narrow; ch08 economy | hypothesis graph + engine |
+| pmem/skills | smem + goal events | drop one-off seqs | which recurring seqs = decompositions | Action DAG |
+
+What we "built" = pieces of specific layers' cycles: `diff_grids`/render = intent
+perceive+filter; `reconcile`/XOR = smem filter; ch08 = smem attend; cons operator =
+each layer's consolidate.
+
+- **Self-similar: cons cycles all the way down.** Same perceive→filter→attend→
+  consolidate at every layer over different inputs (compress-and-unfold's spiral at
+  every scale; the laws name no substrate).
+- **Division of intellect repeats per layer:** ATTEND is the abductive leap
+  (model/LLM, cons's "human decision point"); perceive/filter/consolidate are
+  mechanical (harness). The hygraph "model reasons, harness gates" is the shape of
+  EVERY layer — a thin band of abduction wrapped in mechanical P/F/C.
+- Sharpens budget optimality: a real action is spent only inside an ATTEND step
+  where filter couldn't drop it and cache+model couldn't supply it.
+- Build restated: each layer = the cons quadruple + its cache. git-epmem spike =
+  the intent layer's consolidate+cache; perceive/filter (edge detection) exist;
+  ATTEND (salience / object co-movement) is the piece still owed there.
+
+### CONSOLIDATE is left blank — the agent handles all cache updates
+
+Decision: don't formalize consolidate yet — its shape is unknown (it's the UNSOLVED
+morphism: cons/functor-wizardry say "consolidation remains manual"; hygraph says
+"the model writes, the harness gates"). Leave the slot empty; the AGENT performs
+all cache updates directly. perceive/filter are mechanical and defined; ATTEND and
+CONSOLIDATE are the agent's, with consolidate unconstrained.
+
+**Why safe, not reckless:** convergence comes from the cache STRUCTURE, not the
+consolidate operator. compress-and-unfold: a monotone, write-once, content-
+addressed semilattice climbs to an order-independent LEAST FIXED POINT — independent
+of the writing policy. So enforce the cache laws MECHANICALLY (write-once centers,
+fire-on-presence, content-addressed dedup, collapse-and-rebuild on rot) and a loose
+/ even chaotic agent-driven consolidate STILL CONVERGES. The lattice forgives a
+sloppy writer; the structural axiom does the work the operator's shape would.
+> discipline lives in the cache, not in the operator.
+
+Split per layer: mechanical & defined now = cache + laws, perceive, filter
+(edge detection, reconcile/gate); agent, free, unspecified = attend (abduce) +
+consolidate (write into the law-enforcing cache).
+
+**This is cons applied to itself:** leaving consolidate to the agent AND logging it
+is the cons process pointed at building consolidate. Run manual (agent-driven),
+record writes, watch the recurring shape, extract the operator later (the ratchet).
+Run cons to discover cons. The blank slot is where the next cycle finds its pattern.
+
+### The agent is a quad-paradigm system (four-schools-of-programming)
+
+four-schools: the QUAD (imperative+functional+declarative+actors) IS the
+cognitive-architecture problem as a programming language (Soar/ACT-R hand-wired all
+four; LLM stacks glue them). Our agent maps onto all four:
+- **Imperative** = real-game actions (mutable world, "press the button", the
+  inhale). Irreducible: can't perceive your way out of acting.
+- **Functional** = the model/engine (pure `step`, content-addressed — our decision).
+  Irreducible: a pure transition has no inside → replayable, content-addressable.
+- **Declarative** = goals (scoring constraint) + smem (claims & kill-conditions as a
+  relation network). Irreducible: constraints/relations, what not how.
+- **Actors** = the async layers (the stretch goal). Irreducible: isolated cognition,
+  message-passing via caches.
+Async-layers isn't a side note — it's the 4th school completing the quad.
+
+**Seams = our integration points** (each paradigm's complement patches its seam):
+- *Func+Imp = Kleisli over effect monad* (Moggi/Wadler): pure model can't touch the
+  world (data-processing inequality) → real action = the effectful boundary. The
+  inhale/exhale IS Kleisli composition / the IO monad. The core.
+- *Func+Actors = Unison* (content-addressed pure fns across actors; "pure-vs-stateful
+  is a deployment concern"): our functional model + git + async layers. Validates
+  "async = deployment change, not redesign" — that's Unison's defining property.
+  Prior art for our substrate.
+- *Decl+Actors* = the post's LEAST-settled pair, "where multi-agent LLM lives": our
+  async layers orchestrated by the declarative consolidation/monoid laws. Our
+  stretch goal sits on this exact frontier.
+- *Decl goal patched by procedural pmem*: goal = what scores (declarative), Action
+  DAG = how (imperative escape hatch).
+
+**Assignment rule:** each component uses the paradigm whose "irreducible because"
+matches its nature. We derived each corner separately; four-schools says they're one
+figure. We're building the quad deliberately, at the named seams.
+
+### SERIAL output → no actor model (simplification, retracts the async buffer)
+
+The single game session is inherently SERIAL: one guid, one current state, one
+action at a time, one frame back. The budget-bearing channel (real actions) can't be
+parallelized within a session, and there's all the idle time wanted between actions
+to run the cascade synchronously. So: no concurrency to exploit, drop the actor
+runtime. Architecture = a SERIAL LOOP:
+```
+per step: perceive frame → run cons cascade synchronously (epmem→smem→pmem) →
+          decide → emit ONE action (serial output) → repeat
+```
+Retractions (over-engineering for a serial system):
+- **The async epmem buffer is unnecessary.** The circularity was only in the CODE
+  dependency graph, already handled by downward-only layering — not by async. The
+  cycle is cut by ITERATION: epmem written at end of step N, read by step N+1's
+  consolidation. Sequential iteration decouples without message-passing.
+- **Synchronous consolidation is correct, not a fallback.** Every real action is too
+  budget-precious to spend on stale knowledge → fully consolidate before acting.
+  Background consolidation buys nothing when the loop gates on fresh knowledge.
+Keep vs drop:
+- KEEP the cache LAWS (write-once, monotone, content-addressed dedup): give
+  convergence + forgive loose consolidate, independent of concurrency; leave the
+  door open for optional cross-SESSION (multi-guid) parallelism later (CRDT = free
+  lock-free).
+- DROP the actor RUNTIME (mailboxes, async message-passing, concurrency safety).
+four-schools: quad → TRI-paradigm (imperative actions, functional model, declarative
+goals/smem); the actors corner degenerates to a SINGLE actor = the serial loop (one
+actor = a sequential program). Multi-actor stays the stretch goal — serial output
+means it buys nothing now.
+
+### NEAR-INSTANT execution → no explicit queues
+
+The harness machinery (perceive/filter/consolidate-writes, cache ops over a small
+world) is near-instant, so no backlog ever forms → nothing to buffer → no explicit
+queues. Queues earn their keep only on backpressure (producer > consumer), async
+decoupling (dropped), or batching (per-step is fine) — none apply.
+
+Simplifications compose to the minimal shape:
+- serial output → no actors; near-instant execution → no queues
+- ⇒ a synchronous STRAIGHT-LINE LOOP = function composition
+  `perceive ∘ filter ∘ attend ∘ consolidate ∘ decide` then act. Reinforces the
+  functional decision: no queues means the pipeline IS composition.
+
+Keep vs drop (sharp distinction):
+- KEEP the epmem LOG (git) — a persistent RECORD/cache, not a work-queue.
+- DROP work QUEUES (mailboxes, message buffers, backpressure) — flow-control with no
+  flow to control.
+Only slow boundaries left: real action (API ~s) and LLM attend/abduce (~s) — just
+BLOCKING calls, which is correct (block, act on fresh knowledge, every action
+budget-precious). Slow-synchronous-few beats fast-buffered here.
+
+YAGNI in the right direction: small world + serial session + near-instant harness ⇒
+the simplest shape (synchronous loop of pure-ish functions over a git-backed log) is
+the CORRECT design, not a shortcut. Actor/queue machinery would solve problems this
+system doesn't have.
+
+### Budget optimality: never query the same state twice
+
+Content-addressing + determinism = a STATE-level transposition table:
+`(state_hash, action) → outcome`, queried at most ONCE EVER. State identity is
+path-independent (same content → same hash), so any sequence reaching a state
+inherits every transition already observed there. Pay once, own forever.
+- Stronger than the sequence cache: reconvergent states COLLAPSE. ARC-AGI-3 is
+  full of reconvergence (left·right = identity, undo loops, reversible moves) —
+  every diamond collapses to one node, so you never re-explore a state however you
+  reached it. Big free saving the sequence cache misses.
+- Two-tier "never pay twice": (1) exact (content cache: never re-query an observed
+  transition = recall); (2) generalized (model: never query a predictable
+  transition = deduction). A real action is spent ONLY on transitions both NOVEL
+  (cache miss) AND SURPRISING (model miss) — the intersection, the absolute
+  minimum.
+- This is compress-and-unfold's data-processing inequality made operational:
+  content cache = the recall floor, model = the derivation floor, budget buys only
+  what sits above both (a new dimension only the world can supply).
+- **real-action spend = |novel ∩ surprising transitions|** = the minimum
+  information the agent must pull from the channel. Every reconvergence and every
+  deducible step is free. As efficient as the physics allows.
+
+**Rebuild = `reconcile` (IBLT, port nearly verbatim) as the surprise core +
+hygraph as smem + enumerate via bi-abduction footprints + calibrate against
+cache-free + budget-sampled reality + gate = surprise → abduce + diff-the-diff for
+conditional refinement.** Proven structure, oracle swapped free-total → live-sampled.
+
+### Common engine across levels + functional model (transfer settled)
+
+Observation: level structure is repetitive → the TRANSITION FUNCTION is invariant
+across levels (likely shares primitives across games); only LAYOUT + GOAL change.
+Factor the model:
+```
+model = engine(step: State × Action → State)   ← learned once, transfers across levels
+      + level(initial_state, goal_predicate)    ← re-perceived per level
+```
+Transfer scope (closes the open question):
+- determinism cache (L2): per-session, exact, NO transfer.
+- engine/mechanics (smem): per-GAME, layout-independent (frame rule), transfers
+  ACROSS LEVELS. Object-centric is WHY it transfers.
+- goals: per-level (target shifts); goal-TYPE may recur.
+Budget: pay to learn the engine on level 1, cheap thereafter — mirrors humans.
+RHAE scores each level vs a FIRST-TIME human, so engine-learning on early levels is
+already priced into the baseline; level-1 exploration isn't penalized as feared.
+
+**Functional model representation (decision):** the learned engine is a PURE
+functional program — `step(state, action) → state'`, immutable state, composed
+from per-object pure rules (each mechanic-claim = a pure function). Forced by what
+we built, not stylistic:
+- determinism IS purity (game = pure fn of its action sequence);
+- frame rule IS functional locality/composition (engine = fold of per-object rules);
+- snapshot/restore = immutable values (restore = reuse, no mutation to undo);
+- replay invariant = referential transparency (exact replay by construction);
+- transfer = layout-independence (functions bake in no positions).
+Makes the abductor port EXACT: candidate goes from `Callable[[int],bool]` to
+`Callable[[State,Action],State]` (the synthesized engine), reconciled against the
+game — same gate, one type wider.
+
+**Framing:** the agent does FUNCTIONAL PROGRAM SYNTHESIS of the game engine —
+abduce per-object rewrite rules, compose into `step`, differentially test against
+the live game (the XOR engine), under budget. Same thesis as "Executable World
+Models for ARC-AGI-3" (world model = executable code); functional is the form
+that's pure, composable, replayable, transferable.
+
 ### Built so far (before this planning round)
 - REST client (OpenAPI-faithful), perception (grid render + frame delta),
   random baseline, programmatic Claude policy (`arc3`), agent-facing `arcg`
