@@ -320,6 +320,26 @@ text so the driver learns the rules by hitting them:
 - `arbor: #4 is already killed; verdicts are write-once — succeed it with \`arbor from-kill 4 "<next>"\``  (encodes the write-once axiom)
 - `arbor: can't link to #3: it is open, a successor links only to a killed node`
 
+**Poka-yoke: two layers, and a boundary.** Invariants + instructive errors are the
+mistake-proofing for the HARNESS layer, both kinds: *prevention* (write-once, content-
+addressing, typed precondition guards make a class of mistakes structurally impossible —
+re-kill, double-commit, out-of-range coord) and *instructive detection* (the error names
+the rule AND the recovery, so the driver self-corrects on contact, no docs pre-read).
+The guards fire **pre-API**, so a malformed op costs zero budget — a free bounce, not a
+backstep. But invariants only poka-yoke well-formedness, not wisdom: a valid-but-wrong
+move (wrong action, wrong goal guess) trips no guard. That's the SECOND layer's job —
+the **surprise engine is the poka-yoke for the epistemic layer**: it can't prevent a
+wrong belief, but `piper ⊕ simmer` catches it the instant it mispredicts, the diff bbox
+localizes it, `from-kill` names the correction (so even a wrong act grows the corpus =
+progress). The boundary that keeps poka-yoke from blocking learning: **guard the
+invariants, never the hypotheses.** Enforce only the universally-true (ranges, write-once,
+budget, content-address); stay silent on the game-dependent (action semantics, goals,
+mechanics) — those are hypotheses to verify, not preconditions to enforce. The intent→
+action map ("ACTION3 = left") is a default guess, not a law; hard-guarding it would block
+a valid move or bake a wrong rule into an error and mis-teach the driver. Invariants
+poka-yoke by prevention (hard); hypotheses by the surprise engine (soft). An error
+message must never assert a guess as if it were a law.
+
 **Design-by-contract** (every module; four-schools' Imperative+Declarative seam =
 Hoare logic / Eiffel DbC). Each command carries a three-part contract:
 - **interface + preconditions = TYPES + EXPLICIT GUARDS.** Typed signatures are the
@@ -366,6 +386,23 @@ it, (c) verify a simmer prediction a long plan will depend on, and (d) resolve a
 unknown score implication. The rule is "spend piper where simmer's uncertainty — or
 absence of coverage — makes a free rollout untrustworthy," of which `novel ∩ surprising`
 is the sharpest case, not the whole of it.
+
+**Iteration invariant (don't backstep).** A *productive* iteration advances ≥1 monotone
+measure: the corpus grew, a claim was killed-and-succeeded (strict domination), credence
+rose (witness), a subgoal was discharged, or budget was spent on a novel∩untrustworthy
+transition. A **backstep is an iteration that advances none.** The caches convert most
+would-be backsteps into progress (re-visit → witness; re-derive → cache hit) or into free
+moves (re-inspect a known state → jotter peek, zero budget; re-explore → simmer, free).
+Epistemic revision can't oscillate (from-kill strictly dominates; idempotent dedup never
+re-abduces a dead claim). The only budget-bearing backstep is physical re-reach: `undo`
+O(1) for a single step, `restore` O(N) replay for arbitrary jumps, both pushed toward
+zero by planning the branch in simmer and committing to piper once. So the budget-bearing
+backstep is **structurally bounded** — piper is touched only for corpus-growing
+transitions, each of which IS progress, so a piper action is never a no-progress
+backstep. Unbounded backstepping is confined to the free regime (simmer, reasoning),
+where "too many" costs wall-clock, not RHAE: you can thrash in imagination for free, never
+against the budget. Soft-bounded residual: goal re-abduction under sparse score feedback,
+and exploration order (decide's quality) — both free, bounded by the prior, not structure.
 
 ## Mapping to existing code
 

@@ -954,3 +954,36 @@ fragments (never a from-scratch sound planner). What bit him before was building
 standalone sound symbolic planner. Inputs for a de-risk experiment already exist
 (`objects` + `diff` + a transition corpus) if he wants to prove prose-typed matching
 ahead of building dagger. PLAN.md "### composability" added. dagger still ratchet-deferred.
+
+### Iteration shape locked + two-layer poka-yoke (spec)
+Consolidating the per-step iteration (pieces had accreted: two-root planner, corpus-gated
+abduction, pre/post matching). One turn: perceive (piper.look or jotter cache) → plan in
+simmer (win-down ⊓ act-up, pre/post matched, exhaustive-children by execution) → decide
+(piper only where simmer untrustworthy) → act → jotter.commit (msg=ref(motive)) →
+reconcile (diff) → consolidate (abduce/witness, recompile simmer).
+
+**Don't-backstep = iteration invariant.** A productive iteration advances ≥1 monotone
+measure (corpus grew / claim killed-and-succeeded / credence rose / subgoal discharged /
+budget spent on a novel∩untrustworthy transition); a backstep advances none. Caches turn
+would-be backsteps into progress (re-visit→witness, re-derive→cache hit) or free moves
+(re-inspect→jotter peek, re-explore→simmer). Epistemic revision can't oscillate (from-kill
+strictly dominates, idempotent dedup). Only budget-bearing backstep = physical re-reach
+(undo O(1) / restore O(N)), minimized by planning in simmer + committing to piper once →
+**structurally bounded**: piper touched only for corpus-growing transitions, each IS
+progress. Unbounded backstepping confined to the FREE regime (simmer/reasoning) — thrash
+in imagination for free, never against budget. Soft residual: goal re-abduction (sparse
+score) + exploration order (decide quality), bounded by the prior not structure.
+
+**Poka-yoke = two layers + a boundary** (June's hope, made precise). (1) Invariants +
+instructive errors poka-yoke the HARNESS layer: prevention (write-once/content-addr/typed
+guards make re-kill, double-commit, out-of-range impossible) + instructive detection
+(error names rule AND recovery → self-correct on contact). Guards fire PRE-API → malformed
+op costs zero budget (free bounce, not a backstep). (2) The surprise engine poka-yokes the
+EPISTEMIC layer: can't prevent a wrong belief, but piper⊕simmer catches it on mispredict,
+diff localizes, from-kill corrects (wrong act → corpus growth = progress). Boundary:
+**guard invariants, never hypotheses** — enforce the universally-true (ranges, write-once,
+budget), stay silent on game-dependent semantics (action effects, goals); the intent→
+action map is a default guess not a law, hard-guarding it = false poka-yoke that blocks a
+valid move or mis-teaches via the error text. Invariants prevent (hard); hypotheses are
+caught by surprise (soft); an error must never assert a guess as a law. PLAN.md serial-loop
+invariant + CLI-conventions poka-yoke paragraph added.
