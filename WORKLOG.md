@@ -1012,3 +1012,33 @@ no-session `arcg look` writes `{..."layer":1,"cmd":"look","ok":false,"error":"No
 session...","ms":0.0}`. Single tagged stream while arcg is one CLI; per-module files once
 the five modules split into separate processes. PLAN.md output-contract "Trace channel"
 paragraph added.
+
+### Interface-readiness map (status snapshot)
+Do we know enough to say each component's interface? Yes for what's load-bearing,
+unevenly for the leaves — and the gradient tracks build-order, which is the ratchet
+working not a gap. Two reasons interfaces are more knowable than implementations: (1) the
+shared CONTRACT pins the skeleton of every interface regardless of internals (core verbs +
+identity/merge/codes/JSON-out/instructive-errors/--help); (2) the load-bearing SEAMS are
+settled and tested — piper/simmer swappable pair, cache merge/identity, trace-vs-jotter
+split, inter-module seams (driver→jotter, arbor→simmer compile, piper⊕simmer reconcile).
+
+Per component:
+- piper — BUILT, live-tested; command surface known. Output contract (JSON+exit codes) is
+  a known target but the demo runs on current human strings (LLM driver reads them
+  natively), so JSON/codes adoption is itself ratchet-gated (for the later CODED driver).
+  Ready as-is; nothing forces locking it now.
+- simmer — interface IS piper's (swappable pair) + compile/test. Known as piper's; only
+  internals (step representation) open.
+- arbor — ported from the existing abductor → interface largely known (abduce/witness/kill/
+  from-kill/probe/query/engine/merge), one known mod: trial = corpus-replay. High confidence.
+- jotter — verbs well-sketched (commit ref(motive)/log/why/has/merge), but SUBSTRATE (git vs
+  JSONL/SQLite, codex-contested) is live. Lock verbs provisionally, leave substrate open.
+- dagger — sketch only, and the one place we genuinely don't know enough — correctly. Prose-
+  first means you LEARN the interface from accumulated prose+verified matches, don't design
+  it upfront. Locking now = guessing before the need. Open by design.
+
+Takeaway: you only need to lock the interface of what you build (piper, done); the rest lock
+ON BUILD, informed by the break. Interface-knowability is inversely proportional to deferral
+depth — what's locked is load-bearing+built, what's open is the speculative leaf. The plan's
+CLI sketches are the best current statement and will survive contact in that order. No edit;
+status only.
