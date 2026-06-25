@@ -859,6 +859,37 @@ already there. Real, plan-level hits banked (both answer codex in-place):
   swap worth doing and is exactly what the reconcile step (piper⊕simmer) measures.
   PLAN.md "### The two interfaces are swappable" rewritten to make this explicit.
 
+### jotter commit message = a deterministic pointer into arbor/dagger (spec)
+Pushing the action-provenance track to its clean form. The commit message reduces to a
+bare POINTER wherever a motivating node exists (`arbor:#<id>` / `dagger:<id>`); jotter
+holds the provenance EDGE, arbor holds the content, `jotter why` dereferences. Two
+keystones:
+
+- **Sound because arbor is write-once.** A bare pointer is a stable anchor only if a
+  node's identity+text never mutate in place. arbor already guarantees this (verdicts
+  write-once, revisions are from-kill successors, witnesses append), so no version-
+  pinning needed — #4 later getting killed doesn't rewrite "I acted to test #4" (the
+  kill is usually that action's own result). One forbidden move: editing a claim in
+  place. Upgrades action-provenance from trusted prose to a checkable edge.
+
+- **Deterministic message ⇒ content-addressed idempotence** (June's point, the
+  keystone). `message = ref(motive)` is a pure function of which node the decision
+  selected, so the whole commit is deterministic (tree from action seq, message from
+  motive) and dedup holds: same (state, action, motive) → one node. This IS the
+  precondition for the idempotence law (`f∘f=f`) two entries up — free prose would mint
+  a phantom second node and break dedup. So "pointer-only message" and "jotter commit
+  is idempotent" are the SAME decision from two sides. Non-determinism is quarantined to
+  the DECISION (reasoner's free hypothesis choice); the ENCODING is mechanical → the
+  provenance is driver-agnostic (a coded policy making the same decision → byte-
+  identical commits; reinforces the pluggable-driver seam).
+
+Generalizes past arbor: push every motive to a content-addressed referent —
+arbor:#id / dagger:id / surprise:<diff-hash> / explore:<state-hash> — and there's no
+prose at all; even a blind probe responds to something addressable (a surprise diff, an
+unexplored state). The pre-hypothesis prose residue shrinks to ~zero. Caveat: multi-
+motive actions need a deterministic selection rule (primary motive or full ordered ref-
+set) so the encoding stays single-valued. PLAN.md jotter action-provenance updated.
+
 Other codex hits still open (piper/M0-level, worth banking when piper firms up): an
 explicit determinism test harness (snapshot→act→restore→same act→identical) as a first-
 class M0 acceptance test; assert→typed-exception (asserts optimized out under -O);

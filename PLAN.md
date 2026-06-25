@@ -102,11 +102,32 @@ jotter records the full trajectory, in tracks split by **integrity class**:
 - **belief-provenance** — WHY each claim was believed (the surprise that triggered
   the abduction, the trial that witnessed it). Prose, TRUSTED not replayable; links
   to arbor's claims. (This is also the dependency cone collapse-and-rebuild needs.)
-- **action-provenance** — WHY each action was taken. The commit message is just
-  the reason, ideally a typed ref to the arbor claim it tests or the dagger node it
-  executes (so the action edge walks back into smem/pmem); free prose only for
-  undirected probes. Not a restatement of the action — the action token is commit
-  metadata, the tree is the fact.
+- **action-provenance** — WHY each action was taken. Reduce the commit message to a
+  bare POINTER wherever a motivating node exists: `arbor:#<id>` (claim it tests) or
+  `dagger:<id>` (node it executes). jotter then holds the provenance *edge*, not the
+  rationale prose; arbor holds the content; `jotter why` dereferences. Sound because
+  arbor is **write-once**: a node's identity+text never mutate in place (verdicts
+  write-once, revisions are `from-kill` successors, witnesses append), so the pointer
+  is a stable anchor with NO version-pinning — #4 later getting killed doesn't rewrite
+  "I acted to test #4" (the kill is usually that action's own result). The one
+  forbidden move: editing a claim in place. This upgrades action-provenance from
+  trusted prose to a checkable edge (target exists? was it live at commit time?).
+  Prose survives only at the pre-hypothesis frontier: undirected probes, and the first
+  surprising actions that BIRTH a claim (they can't point forward to a node that
+  doesn't exist yet — their prose is what abduction later reads). The action token is
+  commit metadata, the tree is the fact.
+  Because `message = ref(motive)` is a pure function of which node the decision
+  selected, the *whole* commit is deterministic (tree from the action sequence, message
+  from the motive), so jotter's content-addressed dedup holds: same `(state, action,
+  motive)` → one node. This is the precondition for the idempotence law — a free-prose
+  message would mint a phantom second node and break dedup. The non-determinism is
+  quarantined to the *decision* (the reasoner's free choice of hypothesis); the
+  *encoding* is mechanical, so the provenance is driver-agnostic (a coded policy that
+  makes the same decision produces byte-identical commits). Push every motive to a
+  content-addressed referent — `arbor:#<id>`, `dagger:<id>`, `surprise:<diff-hash>`,
+  `explore:<state-hash>` — and the message is a typed edge with no prose at all.
+  (Multi-motive actions need a deterministic selection rule — primary motive, or the
+  full ordered ref-set — so the encoding stays single-valued.)
 
 The line is the hygraph paper's: the mechanical skeleton (grounded facts) is
 checkable; the prose (the two rationale tracks) is what an auditor would otherwise
