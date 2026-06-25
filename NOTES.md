@@ -76,8 +76,10 @@ commands: `games/start/look/act/note/status/reset/end`. Session persists in
 - Scoring = RHAE efficiency: `(human_baseline_actions / ai_actions)^2`, cap 1.15x.
   Every state-changing action lowers score; only non-state-changing reasoning is
   free. "Replay counts against budget" holds — as a continuous efficiency penalty.
-- **Determinism is NOT documented** — only implied by replayable runs. Treat as a
-  hypothesis to measure (that's what Layer 2's restore-check does), not a given.
+- **Determinism: undocumented but MEASURED true on LS20** (replay of [ACTION3,
+  ACTION3] after full RESET reproduced the cached frame, 2026-06-24). Still treat
+  as a property to keep verifying per game/sequence via Layer 2's restore-check,
+  not a guarantee.
 - ACTION7=undo means cheap O(1) single-step backtrack exists; reset+replay (O(N))
   is only for arbitrary jumps.
 

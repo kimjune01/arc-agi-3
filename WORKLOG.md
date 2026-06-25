@@ -124,6 +124,32 @@ restarts, else the whole game. Two consecutive RESETs = fully fresh game.
   dependency graph is a downward triangle. The boundary test forbids only upward
   edges, not non-adjacent downward ones.
 
+### v1 built + FIRST DETERMINISM MEASUREMENT
+
+Built the layered `arcg` stack (Layers 0-3) per the plan:
+- `arcg/` package: `manifest.py` (layer order as data), `store.py` (substrate:
+  session + determinism cache + snapshots), `layer0_protocol` (raw verbs, sole
+  client importer), `layer1_intent` (move/interact/click/undo + look/diff),
+  `layer2_state` (history/snapshot/restore/peek + budget meter), `layer3_memory`
+  (note/notes), `cli.py` (dispatch derived from manifest).
+- `tests/test_layering.py` enforces no-upward-imports + only-Layer-0-imports-client
+  (derived from the manifest). `tests/test_consistency.py` covers history, budget
+  cap termination, cache round-trip, and BOTH determinism verdicts (deterministic
+  + nondeterministic fake). 23 tests pass. Old `tools.py` removed.
+
+**MEASUREMENT (LS20, live, budget cap 15): post-RESET replay is DETERMINISTIC.**
+Played `move left, move left`, snapshotted, diverged with `move right`, then
+`restore` did full RESET + replay `[ACTION3, ACTION3]` and reproduced the cached
+frame byte-for-byte → `DETERMINISTIC ✓`. So the bench property we hypothesized
+(and the rulebook did NOT document) HOLDS for LS20, at least for this 2-action
+sequence. This is the load-bearing assumption for the whole snapshot/restore
+design — now it has one empirical leg. (Caveat: one game, one short sequence;
+keep the restore-check on to catch any sequence/level where it breaks.)
+
+Also confirmed live: `move left` = ACTION3 slides the 12-block left; budget meter
+increments (1/15...5/15); `restore` cost 3 budget (reset+2 replays), reported;
+`peek` spends 0 budget (cache-only); terminated cleanly under cap via `end`.
+
 ### Built so far (before this planning round)
 - REST client (OpenAPI-faithful), perception (grid render + frame delta),
   random baseline, programmatic Claude policy (`arc3`), agent-facing `arcg`

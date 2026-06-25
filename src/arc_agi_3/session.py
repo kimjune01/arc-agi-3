@@ -30,8 +30,16 @@ class Session:
     step: int = 0
     available_actions: list[str] = field(default_factory=list)
     grid: list[list[int]] = field(default_factory=list)
+    prev_grid: list[list[int]] = field(default_factory=list)
     cookies: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    # Layer 2 substrate: action tokens since the last full RESET, and the budget
+    # meter (every state-changing action counts against RHAE efficiency).
+    history: list[str] = field(default_factory=list)
+    actions_spent: int = 0
+    resets: int = 0
+    # optional tight cap for test runs (~5x human approximation); None = no cap.
+    budget_cap: int | None = None
 
     @classmethod
     def load(cls, path: Path = STATE_FILE) -> "Session":

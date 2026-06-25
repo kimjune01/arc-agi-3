@@ -25,13 +25,22 @@ It plays by calling these `arcg` commands and reading their stdout; the session
 calls, so each command continues the same game:
 
 ```bash
-uv run arcg games                       # list game ids
-uv run arcg start ls20                  # open scorecard, reset, show frame
-uv run arcg act ACTION3 --note "down?"  # act; prints the delta + new frame
-uv run arcg act ACTION6 --x 12 --y 34   # complex/click action
-uv run arcg status                      # state/score/step + notes
-uv run arcg end                         # close scorecard, clear session
+uv run arcg start ls20 --budget 15  # open, reset; tight cap for test runs
+uv run arcg look                    # render the board
+uv run arcg move left               # intent; prints the delta + new frame
+uv run arcg snapshot base           # name the current state (= action sequence)
+uv run arcg peek base               # view it from cache — free, no budget
+uv run arcg restore base            # reset+replay back to it — costs budget
+uv run arcg end                     # close scorecard, clear session
 ```
+
+Commands are layered (`arcg/manifest.py`): **0** protocol (`start/act/end`) ·
+**1** intent+perception (`move/interact/click/undo/look/diff`) · **2**
+state+determinism (`history/snapshot/restore/peek`) · **3** memory (`note`).
+Each layer imports strictly downward; only Layer 0 touches the API client
+(enforced by `tests/test_layering.py`). The game is deterministic after RESET, so
+a state *is* its action sequence — `restore` replays to it and verifies the
+determinism holds.
 
 ## Baselines (non-agentic)
 
@@ -45,9 +54,10 @@ uv run arc3 --agent claude --game ls20   # programmatic Claude policy (JSON in/o
 - `src/arc_agi_3/client.py` — REST client (auth, cookies, scorecard, game loop)
 - `src/arc_agi_3/structs.py` — `FrameData`, `GameAction`, `GameState`, `Action`
 - `src/arc_agi_3/agents/` — `base.Agent` (loop+verdict), `random_agent`
-- `src/arc_agi_3/tools.py` — `arcg` agent-facing tools (stateful session)
-- `src/arc_agi_3/session.py` — persisted session (ids, grid, cookies, notes)
-- `src/arc_agi_3/policy_claude.py` + `agents/llm_agent.py` — Claude policy
-- `src/arc_agi_3/main.py` — `arc3` batch runner
+- `src/arc_agi_3/arcg/` — the layered `arcg` surface (manifest, store, layer0-3, cli)
+- `src/arc_agi_3/client.py` · `perception.py` · `structs.py` — Layer 0/1 internals + vocabulary
+- `src/arc_agi_3/session.py` — persisted session substrate
+- `src/arc_agi_3/policy_claude.py` + `agents/llm_agent.py` + `main.py` — programmatic
+  `arc3` policy (legacy; bypasses `arcg` — migration to the surface pending)
 - `AGENT.md` — playbook handed to Claude when it plays via `arcg`
-- `tests/` — offline proofs (loop, perception, parser, session)
+- `tests/` — offline proofs (layering, consistency, perception, session, loop, parser)
