@@ -608,6 +608,35 @@ the simplest shape (synchronous loop of pure-ish functions over a git-backed log
 the CORRECT design, not a shortcut. Actor/queue machinery would solve problems this
 system doesn't have.
 
+### Exact/Boolean regime, not statistical (Peirce, via determinism)
+
+Peirce was doing Boolean logic (extended Boole: quantifiers, algebra of relations,
+Peirce's law) and critiquing the "fallacy of syllogism" — deduction is ANALYTIC,
+adds no content; the ampliative work is abduction. He wrote it in 1878, presaging
+and dunking on statistical inference decades before Fisher/Neyman.
+
+Consequences for the agent:
+- **His syllogism critique = the data-processing inequality, in logic, 70 yrs before
+  Shannon.** "Deduction adds nothing" ≡ "no computation on what you hold raises what
+  it tells you about the world." So simmer (deduction/simulation) is Peirce's
+  syllogism: exact, free, knowledge-NEUTRAL. The fallacy = mistaking a simulation
+  for discovery. Only the real action (abduction grounded in the world) adds content.
+- **Determinism puts us in the EXACT/BOOLEAN regime — statistics is a category error
+  here.** Noiseless channel → every op is Boolean, not statistical:
+  - a mechanic-claim is a Boolean predicate (moves-left? yes/no, exactly);
+  - XOR/reconcile is literal set difference (IBLT = Boolean set logic, not inference
+    under noise);
+  - the kill is EXACT — one counterexample refutes (Popper/Peirce, not Fisher); no
+    p-value, no power, no confidence interval;
+  - "credence" = the hygraph's three Boolean states (open/killed/witnessed); the
+    mode-cap is a convention, not a probability.
+- Statistics only re-enters if the game is STOCHASTIC (noisy channel → redundancy +
+  sampling = the error-correcting code, compress-and-unfold's high-noise branch).
+  Determinism keeps the whole agent in the algebra of logic.
+- **Design line (what NOT to build):** an exact-logic engine, not a statistical
+  learner. No probability estimation, no confidence thresholds, no
+  sampling-to-significance. Boolean status + exact kills.
+
 ### Budget optimality: never query the same state twice
 
 Content-addressing + determinism = a STATE-level transposition table:
