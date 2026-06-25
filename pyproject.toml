@@ -1,0 +1,27 @@
+[project]
+name = "arc-agi-3"
+version = "0.1.0"
+description = "An agent that plays the ARC-AGI-3 interactive reasoning benchmark."
+readme = "README.md"
+authors = [
+    { name = "June", email = "kimjune01@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "numpy>=2.5.0",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+arc3 = "arc_agi_3.main:main"
+arcg = "arc_agi_3.tools:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.13,<0.10.0"]
+build-backend = "uv_build"
