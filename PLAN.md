@@ -310,6 +310,24 @@ Output contract: artifact → **stdout as JSON** (default when stdout isn't a TT
 **no command ever prompts**. `-` means stdin. State lives in a file located by an
 env var (e.g. `PIPER_SESSION`, `ARBOR_GRAPH`).
 
+**Trace channel (third stream): each module appends its own operational trace** to an
+append-only JSONL for POST-OP inspection — distinct from stdout (the artifact the driver
+consumes) and stderr (instructive narration the driver reads in-loop). One JSON event per
+invocation: `{ts, tool, layer, cmd, args, ok, error?, ms, step?}`, where `step` (the
+turn id, or the jotter state-hash) correlates the per-module streams into one causal
+order. This is OBSERVABILITY, not memory — the opposite integrity class from jotter:
+append-only and *duplicate-preserving* (the one log where idempotence is WRONG — you want
+every repeat, retry, and guard-bounce, with timing, in order), a free monoid (concat, not
+the idempotent cache join), human-read after the run, never reasoned over in-loop. jotter
+records the *result*; the trace records the *operation*. It's what makes the design's
+claims MEASURABLE post-hoc: budget spend (sum the piper traces), the iteration invariant
+(did each turn advance a monotone measure, or backstep?), poka-yoke efficacy (which
+guard-bounces recur → which instructive error to sharpen), determinism (diff two runs'
+traces to localize divergence). So it's the **ratchet's instrument** — "watch where the
+manual version breaks" is vibes without it, a measurement with it — and therefore NOT
+ratchet-deferred: it lands early, alongside piper. (Per-module file per separate CLI
+process; while arcg is one CLI, one `trace.jsonl` tagged by `layer`.)
+
 **Instructive error messages** (the key convention). Every error names *what went
 wrong AND what to do*, tool-prefixed, on stderr. Encode the invariants in the error
 text so the driver learns the rules by hitting them:

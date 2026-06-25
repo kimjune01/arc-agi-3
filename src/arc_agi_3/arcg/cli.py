@@ -8,6 +8,7 @@ functions are what a programmatic policy calls (one shared surface).
 from __future__ import annotations
 
 import argparse
+import time
 
 from dotenv import load_dotenv
 
@@ -15,6 +16,17 @@ from . import layer0_protocol as l0
 from . import layer1_intent as l1
 from . import layer2_state as l2
 from . import layer3_memory as l3
+from . import trace
+
+# Each command's home layer, so every trace event is tagged ("each layer emits its
+# own traces" — one stream tagged by layer while arcg is a single CLI; per-module
+# files once the five modules are split into separate processes).
+_LAYER = {
+    "games": 0, "start": 0, "act": 0, "reset": 0, "end": 0,
+    "move": 1, "interact": 1, "click": 1, "undo": 1, "look": 1, "diff": 1, "objects": 1,
+    "history": 2, "snapshot": 2, "restore": 2, "peek": 2,
+    "note": 3, "notes": 3,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -83,10 +95,22 @@ def _fmt(frame) -> str:
 def main() -> None:
     load_dotenv()
     args = build_parser().parse_args()
+    base = {
+        "tool": "arcg", "layer": _LAYER.get(args.cmd), "cmd": args.cmd,
+        "args": {k: v for k, v in vars(args).items() if k not in ("fn", "cmd", "layer")},
+    }
+    start = time.perf_counter()
     try:
-        print(args.fn(args))
-    except l0.BudgetExceeded as e:
-        raise SystemExit(f"TERMINATED: {e}")
+        out = args.fn(args)
+    except BaseException as e:  # trace the failure, then preserve original behavior
+        trace.emit({**base, "ok": False, "error": str(e),
+                    "ms": round((time.perf_counter() - start) * 1000, 1)})
+        if isinstance(e, l0.BudgetExceeded):
+            raise SystemExit(f"TERMINATED: {e}")
+        raise
+    trace.emit({**base, "ok": True,
+                "ms": round((time.perf_counter() - start) * 1000, 1)})
+    print(out)
 
 
 if __name__ == "__main__":

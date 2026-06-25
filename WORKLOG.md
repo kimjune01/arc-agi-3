@@ -987,3 +987,28 @@ action map is a default guess not a law, hard-guarding it = false poka-yoke that
 valid move or mis-teaches via the error text. Invariants prevent (hard); hypotheses are
 caught by surprise (soft); an error must never assert a guess as a law. PLAN.md serial-loop
 invariant + CLI-conventions poka-yoke paragraph added.
+
+### Per-module trace channel (append-only JSONL) — built in arcg + spec
+Each layer/module emits its own operational trace to an append-only JSONL for post-op
+inspection. The point that keeps it clean: it's the OPPOSITE integrity class from jotter.
+jotter = domain memory (content-addressed, deduped, idempotent, agent-read in-loop,
+records the *result*). The trace = observability (append-only, DUPLICATE-preserving —
+the one log where idempotence is wrong, you want every repeat/retry/guard-bounce with
+timing in order; a free monoid not the idempotent join; human-read after, records the
+*operation*). Don't let them bleed. Per-module streams + a correlation id (step/turn or
+state-hash) so they join into one causal order for whole-turn inspection.
+
+Why not ratchet-deferred: the trace is the ratchet's INSTRUMENT. "Watch where the manual
+version breaks" is vibes without structured traces, a measurement with them — budget spend
+(sum piper traces), the iteration invariant (per-turn monotone progress vs backstep),
+poka-yoke efficacy (recurring guard-bounces → which instructive error to sharpen),
+determinism (diff two runs' traces). So it lands early, alongside piper.
+
+BUILT in arcg (committed): `arcg/trace.py` (`emit(event)` → one ts-stamped JSON line,
+append-only) + dispatcher wiring in `cli.py` (every command traced via a `_LAYER` map:
+`{ts, tool, layer, cmd, args, ok, error?, ms}`; failures traced then original exit
+behavior preserved). 2 tests (append-only + envelope); 29 pass. End-to-end verified: a
+no-session `arcg look` writes `{..."layer":1,"cmd":"look","ok":false,"error":"No active
+session...","ms":0.0}`. Single tagged stream while arcg is one CLI; per-module files once
+the five modules split into separate processes. PLAN.md output-contract "Trace channel"
+paragraph added.
