@@ -1072,3 +1072,29 @@ win-down head (free, orients) → act-up body (first secured node + alphabet) �
 grows as alphabet fills. = the t0 of the uberty→security flow. Explainer: session opens with
 look + objects + noted goal-guess, then a goal-biased probe (first action = a test, not a coin
 flip). PLAN.md "### uberty vs security" + "### cold start" added.
+
+### M0 TEST DRIVE — piper + Claude-Code-as-driver on LS20, live (works)
+Took the demo for a live drive (I drove piper via the CLIs; scorecard 2f83c1f8, budget
+3/25, aggregate 0.0 — exploratory, no level completed). Everything in M0 worked:
+- piper live: start / look / objects / move / diff / snapshot / restore / note / end.
+- `objects` (new this session) live and useful: segmented the start frame into 18 objects
+  / 8 colours, background 4 auto-excluded; immediately surfaced the 12-avatar, the boxed
+  9-patterns, the UI frame.
+- Cold-start sequence ran exactly as designed: t0 goal-guess from the static frame (uberty,
+  free) → goal-biased probe → first edge → act-up's first mechanic. No random first move.
+- Mechanic abduced from the first diff: ACTION1=up moves the 12-avatar up 5 cells, a trailing
+  9-tail follows below (snake/train), the bottom 11-bar depletes 2/action (energy/move
+  meter). WITNESSED on the 2nd up-move (consistent → credence up, security accruing).
+- DETERMINISM keystone verified LIVE: snapshot m1=[ACTION1] → restore → "DETERMINISTIC ✓
+  (replay reproduced the cached frame)". The whole Boolean-kill edifice rests on this; it
+  holds on LS20.
+- Trace channel captured the full drive (12 events, layer-tagged). Timing makes cost
+  visible: piper API ops 340-660ms (move/restore), free local ops <3ms (diff/objects/note)
+  — exactly the budget signal the trace is for.
+
+Ratchet verdict: the in-head version did NOT break. piper + Claude-Code-driver + prose
+notes covered the early game (perception, goal-guess, mechanic abduction, witnessing,
+determinism-backed snapshot/restore) with nothing to codify. Validates build-as-little:
+jotter/arbor/simmer/dagger stay deferred. Watch-for-break signals noted but not yet hit:
+grid is ~4KB/look (context pressure → jotter when trajectory outgrows context); prose-noted
+mechanics worked for 1 (arbor when claims multiply). No code changed this turn.
