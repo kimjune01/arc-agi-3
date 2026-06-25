@@ -890,11 +890,29 @@ unexplored state). The pre-hypothesis prose residue shrinks to ~zero. Caveat: mu
 motive actions need a deterministic selection rule (primary motive or full ordered ref-
 set) so the encoding stays single-valued. PLAN.md jotter action-provenance updated.
 
-Other codex hits still open (piper/M0-level, worth banking when piper firms up): an
-explicit determinism test harness (snapshot→act→restore→same act→identical) as a first-
-class M0 acceptance test; assert→typed-exception (asserts optimized out under -O);
-"tool never judges" reword to "mechanical validation not strategy" (probe/diff/kill-if
-do adjudicate); recording-ownership (piper vs driver writes jotter); "novel ∩ surprising"
-too narrow (must sometimes spend piper to traverse/confirm); state/action/diff/episode
-schemas absent and they're piper-level. Codex's defer-everything thrust itself = the
-ratchet restated; no change. Lean kept: bold, codex is sparring not arbiter.
+APPLIED (the codex hits I agreed with, banked into PLAN.md):
+- **determinism test as a first-class M0 acceptance gate** (snapshot→act→restore→same
+  act→identical state/diff/score, re-run per game/sequence) + undo characterized /
+  budget visible / diff machine-readable / errors recoverable. The Boolean-kill edifice
+  rests on determinism, so it can't be a `restore` side-effect.
+- **assert → explicit typed guard** in design-by-contract (asserts stripped under
+  `python -O`; preconditions are load-bearing contract, not debug scaffolding).
+- **"tool never judges" → "tool computes, never strategizes"**: a command MAY return a
+  mechanical verdict (diff/kill-if/probe adjudicate facts), it just never *interprets*
+  (propose/rank/diagnose/decide). Honest version of the harness/reasoner split.
+- **recording ownership**: the DRIVER commits piper's frames (serial loop calls
+  jotter.commit after piper.act); piper never imports jotter, stays client-only. Fixes
+  the "jotter records piper's frames" coupling.
+- **"novel ∩ surprising" widened**: it's the sharpest case, not the whole rule. decide
+  also spends piper to traverse to an unreached region, confirm a long sequence, verify
+  a simmer prediction a long plan depends on, or resolve an unknown score implication.
+  Rule: spend piper where simmer's uncertainty/no-coverage makes a free rollout
+  untrustworthy.
+
+DECLINED / deferred (disagreed or premature): cut the monoidal contract (load-bearing,
+kept — scoped to caches, which the idempotence rewrite already does); define all
+state/action/diff/episode schemas now (the implicit schemas live in structs.py/
+perception.py; formalizing them is the target JSON contract, premature per the ratchet —
+revisit when piper's CLI output contract is actually adopted); defer/cut the cognitive
+modules (= the ratchet restated, already the plan). Lean kept: bold, codex is sparring
+not arbiter.

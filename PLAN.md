@@ -202,7 +202,7 @@ So the whole pipeline is monoidal — composable and convergent by construction.
 
 ```
 piper        (real game: I/O + perception)     ← imports the API client only
-  jotter     (git epmem)                         ← records piper's frames
+  jotter     (git epmem)                         ← the DRIVER commits piper's frames here (piper stays client-only)
     arbor    (hygraph smem)                       ← claims about the episodes
       simmer (functional sim, piper's interface)  ← compiled from arbor
         dagger (action-dag pmem)                  ← plans via simmer rollouts
@@ -210,6 +210,11 @@ piper        (real game: I/O + perception)     ← imports the API client only
 ```
 A test (`tests/test_layering.py`, ported) derives this from a manifest and forbids
 upward imports. Only piper imports the game client.
+
+**Recording is the driver's job, not piper's.** The serial loop calls `jotter.commit`
+after `piper.act`, so piper never imports jotter — it stays at the bottom, client-only,
+emitting frames the driver commits. (Resolves the apparent coupling: "jotter records
+piper's frames" is the driver doing it, not piper reaching up.)
 
 ## CLI surfaces (each independently runnable)
 
@@ -236,10 +241,13 @@ identical-interface means you can A/B them by hand: `piper act X` vs `simmer act
 Agent-first (clig.dev baseline, bent toward an agent in a debug loop, not a human at
 a prompt). Two rules carry the surface:
 
-1. **The tool never judges.** Every command is a deterministic op over a cache —
-   act, diff, reconcile, abduce-append, replay. No command proposes, ranks, or
-   decides what a result means; that is the driver's (Claude Code's) job. No
-   `diagnose`, no `suggest`. (This is "modules = harness, Claude Code = reasoner.")
+1. **The tool computes, never strategizes.** Every command is a deterministic op over
+   a cache: act, diff, reconcile, abduce-append, replay. A command MAY return a
+   *mechanical* verdict (diff agrees/disagrees, a node is killed/open, a trial passes/
+   fails); that's computation, not judgment. What no command does is *interpret* the
+   verdict: propose, rank, diagnose, or decide what to do about it. That is the driver's
+   (Claude Code's) job. No `diagnose`, no `suggest`. (This is "modules = harness, Claude
+   Code = reasoner": the harness adjudicates facts mechanically, the reasoner strategizes.)
 2. **The exit code is the verdict.** The driver routes on the status code without
    parsing stdout. Publish an `EXIT_CODES` table and a `<tool> codes` command so the
    driver never scrapes docs. Convention: `0` ok/agree, `10` disagree/surprise,
@@ -262,16 +270,18 @@ text so the driver learns the rules by hitting them:
 
 **Design-by-contract** (every module; four-schools' Imperative+Declarative seam =
 Hoare logic / Eiffel DbC). Each command carries a three-part contract:
-- **interface + preconditions = TYPES + ASSERTS.** Typed signatures are the
-  interface; `assert`s at entry enforce preconditions and fail loud with a
-  tool-prefixed instructive message (a precondition violation IS an instructive
-  error): `assert 0 <= x <= 63, f"piper: ACTION6 x must be 0-63, got {x}"`. The
-  driver learns preconditions by hitting them.
+- **interface + preconditions = TYPES + EXPLICIT GUARDS.** Typed signatures are the
+  interface; preconditions are explicit guards at entry that raise a typed,
+  tool-prefixed instructive error (a precondition violation IS an instructive error):
+  `if not 0 <= x <= 63: raise UsageError(f"piper: ACTION6 x must be 0-63, got {x}")`.
+  NOT bare `assert` — `python -O` strips asserts, and these guards are load-bearing
+  contract, not debug scaffolding. The driver learns preconditions by hitting them.
 - **postconditions = COMMENTS in `--help`.** What the command guarantees on success,
   in the progressive reference: `piper act --help` → "Post: budget += 1; new frame
   committed to jotter; returns the deterministic successor."
-- **invariants = the monoidal / cache laws, asserted.** `arbor witness` asserts the
-  node was `open` (write-once); `jotter commit` asserts content-addressed dedup.
+- **invariants = the monoidal / cache laws, CHECKED.** `arbor witness` checks the
+  node was `open` (write-once); `jotter commit` checks content-addressed dedup — each
+  raising a typed error on violation (again, an explicit guard, not `assert`: -O-safe).
   The laws that make a loose consolidate converge, machine-checked not just documented.
 
 **Onboarding by progressive disclosure** (per the explainer decision): each tool
@@ -289,16 +299,21 @@ Synchronous, no actors, no queues:
 per step:
   s      = piper.look                          # perceive (edge detection)
   pred   = simmer.act(a)                        # deduction, free (sim = compiled arbor)
-  real   = piper.act(a)                         # the imperative inhale — only on novel ∩ surprising
+  real   = piper.act(a)                         # the imperative inhale: where simmer is untrustworthy
   jotter.commit(real, a)                        # record (content-addressed; dedup; never re-query a state)
   surprise = jotter.diff(pred, real)            # XOR: piper ⊕ simmer
   if surprise: agent abduces → arbor.*          #   → arbor recompiles simmer (consolidate, agent-driven)
   else:        arbor.witness(...)               #   credence up, no new node
   plan   = dagger.plan(goal)                    # decompose toward the goal, over simmer rollouts
-  a'     = decide(plan, surprise, budget)       # spend real budget only where simmer is unsure
+  a'     = decide(plan, surprise, budget)       # spend real budget where a free rollout is untrustworthy
 ```
-Most exploration runs on simmer (free); piper is touched only for the irreducible
-`novel ∩ surprising` transitions.
+Most exploration runs on simmer (free); piper is the irreducible spend. `novel ∩
+surprising` is the *core* trigger but not the only one: `decide` also spends piper to
+(a) traverse to an unreached region, (b) confirm a long sequence before committing to
+it, (c) verify a simmer prediction a long plan will depend on, and (d) resolve an
+unknown score implication. The rule is "spend piper where simmer's uncertainty — or
+absence of coverage — makes a free rollout untrustworthy," of which `novel ∩ surprising`
+is the sharpest case, not the whole of it.
 
 ## Mapping to existing code
 
@@ -319,6 +334,14 @@ Most exploration runs on simmer (free); piper is touched only for the irreducibl
 1. **piper** — refine the existing `arcg` into the piper CLI: ensure
    act/look/diff/snapshot/restore + add `undo` (ACTION7) and `objects` (spatial
    edges). The one essential build (~90% exists). Live-testable on LS20.
+   - **piper acceptance gate** (lock before any cognitive module). The whole
+     Boolean-kill edifice rests on determinism, so make it a *first-class* test, not an
+     incidental `restore` side-effect: `snapshot → act → restore → same act →
+     identical state/diff/score` must hold on LS20, re-run per game/sequence
+     (determinism is measured, never assumed). Plus the contract surface a driver will
+     lean on: `undo` characterized (does it cost budget? restore score? hidden state?),
+     budget accounting visible and trusted, `diff` machine-readable, action errors
+     explicit and recoverable. These are piper-level, inside M0 — not deferred.
 2. **explainer prompt** — a short session-onboarding prompt that catches the driver
    up: the goal, the serial loop (perceive → predict in-head → act / experiment via
    snapshot/restore/undo → reconcile in-head → note claims as prose → plan in-head →
