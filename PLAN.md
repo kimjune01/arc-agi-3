@@ -51,11 +51,19 @@ system: do it manually, watch where it breaks, codify that part. Don't pre-build
 | **dagger** | DAG | pmem: the Action DAG (goal→action decompositions, JIT-on-miss) | memory cache | declarative+procedural |
 
 ### The two interfaces are swappable
-piper and simmer expose the **same game API** (`reset / act / look / diff / state /
-score`). The agent code is written once against "a game"; point it at piper to act
-on reality (exact, budget-bearing) or simmer to act in imagination (free,
-approximate). This is the model-based core: **plan in simmer, commit in piper,
-reconcile by running both and diffing.**
+piper and simmer expose an **identical operative interface** — the same verbs, same
+args, same return shape (`reset / act / look / diff / state / score`) — so a call site
+is byte-for-byte substitutable between them. The agent code is written once against
+"a game" and pointed at either. **Interface identical, contract different**: that's
+the whole point, and the distinction is load-bearing, not a fudge. The *operative
+interface* (what you call and what comes back) is the same; the *contract* (cost,
+exactness, mutation) is not — piper acts on reality (exact, budget-bearing,
+side-effecting), simmer acts in imagination (free, approximate, pure). Substitutability
+lives at the interface; the contract is what makes the swap *worth* doing. This is the
+model-based core: **plan in simmer, commit in piper, reconcile by running both and
+diffing** — only possible because the same code drives both. (So "identical semantics"
+is the wrong test: identical *signature*, divergent *cost/exactness*. The reconcile
+step exists precisely to measure the contract gap.)
 
 ### simmer is compiled from arbor
 arbor holds the mechanic-claims (declarative); **simmer is their executable form** —
@@ -151,9 +159,18 @@ meet-semilattice = the merge law), sequence (non-commutative = the action monoid
   `reset` is the interfaces' identity). Applying it changes nothing.
 - **associativity** — grouping of composed ops doesn't change the result
   (`act∘act`, cache merges).
-- **idempotence** — re-applying on a converged state is a no-op (two-pass
-  convergence; dedup). `jotter commit X; jotter commit X` → one node. Deterministic
-  replay on both interfaces is idempotent by construction.
+- **idempotence** — the test is `f ≠ I ∧ f∘f = f`: a *non-trivial* idempotent. On an
+  already-converged state `f = I` and the law says nothing (that vacuous case is the
+  "fake rigor" smell); the fixture must start where the op BITES — apply once, assert
+  the state changed (`f ≠ I`); apply again, assert it didn't (`f∘f = f`). Witnesses:
+  `jotter commit X` (set-add, then dedup), `arbor kill #n` (write-once), cache
+  `merge b` for `b ⊄ state` (semilattice join). The clause *delimits* the law as much
+  as it asserts it: `piper act` FAILS it by design (act twice moves twice, spends
+  twice), so act is never claimed idempotent — the test is the discriminator between
+  cache writes and the budget-bearing game op. It also forces the discipline: a write
+  passes only if keyed by content/evidence (a join); a naive `arbor witness` doing
+  credence `++` goes red until it's keyed by trial-id (set-add the evidence — the law
+  and the correct "don't double-count a trial" semantics are the same constraint).
 - **commutative merge** (caches) — `merge(a,b)=merge(b,a)`, a join-semilattice /
   CRDT. Axiom: write-once centers, fire-on-presence, collapse-and-rebuild on rot.
   This is what lets the loose/agent consolidate still converge.

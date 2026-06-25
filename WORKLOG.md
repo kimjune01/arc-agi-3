@@ -831,3 +831,39 @@ Composition algebra (matches the monoidal contract): goal conjunction = commutat
 idempotent meet-semilattice (= the merge law); sequence = non-commutative action
 monoid. Peirce triad closes: abduce=win-down, deduce=act-up, induce=arbor's witness.
 PLAN.md "### goals and actions meet in the middle" added. Still spec; dagger deferred.
+
+### Codex sniff on PLAN.md → two contract sharpenings (the rest was a misread)
+Sent PLAN.md to codex. Headline "main contradiction" (build-as-little vs full
+architecture) was mostly a legibility miss — codex read the five-module TARGET as a
+build list and recoiled, then proposed an M0-M5 staging that's ~the §Build order
+already there. Real, plan-level hits banked (both answer codex in-place):
+
+- **Idempotence is a NON-TRIVIAL idempotent test: `f ≠ I ∧ f∘f = f`** (June's framing).
+  Codex called the monoidal contract "fake rigor" because `act` isn't idempotent. The
+  answer: idempotence on a converged state is vacuous (f = I, proves nothing); the test
+  must start where the op BITES — apply once → state changed (f ≠ I); apply again → no
+  change (f∘f = f). Witnesses: jotter commit X (set-add→dedup), arbor kill #n (write-
+  once), cache merge b for b⊄state (semilattice join). The clause DELIMITS the law:
+  piper act FAILS by design (twice = move twice/spend twice), so the test is the
+  discriminator between cache writes and the budget-bearing game op — codex's "act
+  isn't idempotent" is the test working, not a hole. Forces the discipline: writes pass
+  only if keyed by content/evidence (a join); a naive arbor witness doing credence++
+  goes red until keyed by trial-id (set-add evidence = the "don't double-count a trial"
+  semantics). Law and correctness are the same constraint.
+
+- **piper/simmer: identical OPERATIVE INTERFACE, different contract** (June). Codex:
+  "can't expose identical semantics." Right test isn't semantics — it's signature.
+  Same verbs/args/return shape → a call site is byte-substitutable; the CONTRACT (cost,
+  exactness, mutation) differs (piper exact/budget/side-effecting, simmer free/approx/
+  pure). Substitutability lives at the interface; the contract gap is what makes the
+  swap worth doing and is exactly what the reconcile step (piper⊕simmer) measures.
+  PLAN.md "### The two interfaces are swappable" rewritten to make this explicit.
+
+Other codex hits still open (piper/M0-level, worth banking when piper firms up): an
+explicit determinism test harness (snapshot→act→restore→same act→identical) as a first-
+class M0 acceptance test; assert→typed-exception (asserts optimized out under -O);
+"tool never judges" reword to "mechanical validation not strategy" (probe/diff/kill-if
+do adjudicate); recording-ownership (piper vs driver writes jotter); "novel ∩ surprising"
+too narrow (must sometimes spend piper to traverse/confirm); state/action/diff/episode
+schemas absent and they're piper-level. Codex's defer-everything thrust itself = the
+ratchet restated; no change. Lean kept: bold, codex is sparring not arbiter.
