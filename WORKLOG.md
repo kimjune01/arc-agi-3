@@ -1042,3 +1042,33 @@ ON BUILD, informed by the break. Interface-knowability is inversely proportional
 depth — what's locked is load-bearing+built, what's open is the speculative leaf. The plan's
 CLI sketches are the best current statement and will survive contact in that order. No edit;
 status only.
+
+### uberty vs security: a flow to schedule, not a balance (Peirce) + cold-start sequencing
+June's tension: the Action DAG starts at max uberty / no security and ends with security /
+less uberty, pulling opposite. Resolution: it's not a balance to strike, it's a directed
+flow (uberty → security) the architecture already meters.
+- **Not monotone** — the surprise engine re-injects uberty exactly where security breaks (a
+  kill-edge IS a uberty-injection); sawtooth not slide. Global uberty early, localized
+  uberty pockets at the surprising frontier late. Always maximally fertile where ignorant,
+  secure where verified; boundary moves itself, no global knob.
+- **Budget is the regulator** — uberty free (simmer), security dear (piper); cost gradient
+  front-loads uberty, back-loads security (Peirce's economy of research, falls out of RHAE).
+- **Poles at different depths** — uberty at the frontier (open/win-down), security at the
+  core (witnessed/act-up); the two roots MEETING is the conversion. dagger's JIT-on-miss is
+  the allocator (hit=security free, miss=uberty abduce→verify→bank, failed decomposition =
+  local uberty re-injection). write-once + from-kill = security accrues NON-destructively,
+  so it never strangles uberty (re-abduction always open) — guard vs premature convergence.
+- **Residual** (same fault line): auto-scheduled for dense feedback (mechanics, plans-over-
+  simmer); carried by hand via the prior for GOALS (sparse score → uberty cheap to spawn,
+  costly to secure).
+
+**Cold start — which root first?** Staggered, not symmetric. act-up needs an EDGE; win-down's
+head needs only a CONFIGURATION. So t0 (static frame, pre-action): only win-down's HEAD can
+fire — a goal-guess from the prior (free, pure uberty) + object roles from `objects`. Not a
+plan (alphabet empty), an exploration BIAS aiming the first action. First action → first edge
+→ act-up fires (first mechanic = first security), diff resolves a perceptual guess. Then both
+grow together but win-down's BODY is parasitic on act-up's alphabet, so it lags. Sequence:
+win-down head (free, orients) → act-up body (first secured node + alphabet) → win-down body
+grows as alphabet fills. = the t0 of the uberty→security flow. Explainer: session opens with
+look + objects + noted goal-guess, then a goal-biased probe (first action = a test, not a coin
+flip). PLAN.md "### uberty vs security" + "### cold start" added.

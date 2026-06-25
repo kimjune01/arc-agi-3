@@ -226,6 +226,47 @@ into a knob: conditions **index** simmer (never model it), conditions are **pros
 then corpus-abduced** (never hand-authored upfront), the DAG is a **JIT cache of verified
 fragments** (never a from-scratch sound planner).
 
+### uberty vs security: a flow to schedule, not a balance to strike (Peirce)
+The DAG's poles pull opposite: at the start maximal **uberty** (fertile guessing) and no
+**security** (no grounding); as it learns, more security and less uberty. Don't resolve it
+as a balance — it's a directed flow (uberty → security) the architecture already meters.
+(1) **Not monotone**: the surprise engine re-injects uberty exactly where security breaks
+(a kill-edge IS a uberty-injection), so the trajectory is a sawtooth, not a slide — global
+uberty early, localized uberty pockets at the surprising frontier late. The system is
+always maximally fertile where ignorant, maximally secure where verified; the boundary
+moves itself, no global knob. (2) **Budget is the regulator**: uberty is free (simmer),
+security is dear (piper), so the cost gradient front-loads uberty and back-loads security
+(Peirce's economy of research, falling out of RHAE). (3) **The poles sit at different
+depths**: uberty at the frontier (open nodes, win-down guesses), security at the core
+(witnessed nodes, act-up reachable set); the two roots MEETING is the conversion (a
+win-down guess cashed into an act-up verified path). dagger's JIT-on-miss is the
+allocator: a hit spends security (free), a miss spends uberty (abduce → verify → bank), a
+failed decomposition re-injects uberty locally (re-abduce the missing child). write-once +
+from-kill make security accrue NON-destructively, so gaining it never strangles uberty
+(the option to re-abduce stays open) — the guard against premature convergence. Residual
+(same fault line): auto-scheduled for the dense-feedback layer (mechanics,
+plans-over-simmer); carried by hand via the LLM prior for GOALS (sparse score → uberty
+cheap to spawn, expensive to secure).
+
+### cold start: goal-guess first (free), first mechanic second (paid)
+A staggered bootstrap, not symmetric simultaneity — the asymmetry is forced by what each
+root needs as input. act-up needs an EDGE (a mechanic is a claim about a transition);
+win-down's HEAD needs only a CONFIGURATION (the prior reads the static frame and guesses
+the objective). So at **t0 (static frame, pre-action) the only inference available is
+win-down's head**: a goal-guess (free, pure uberty, zero security) + candidate object
+roles from `objects`. It's not a plan (the alphabet is empty, nothing to regress through);
+it's an exploration BIAS that aims the first action (probe the salient/avatar-like object,
+act toward the guess) instead of acting randomly. The first action buys the first edge →
+**act-up fires (first mechanic = first security)** and the diff resolves a t0 perceptual
+guess (which object is the avatar). From the first edge on both grow together, but
+win-down's BODY stays parasitic on act-up's alphabet (can't regress a goal through
+mechanics you don't have), so it lags. Sequence: win-down head (free, orients) → act-up
+body (first secured node + the alphabet) → win-down body grows as the alphabet fills. This
+is the t0 of the uberty→security flow: free guessing at the uberty pole, the first paid
+action begins the conversion. (Explainer consequence: the session opens with `look` +
+`objects` + a noted goal-guess, then a goal-biased probe — the first action is a
+hypothesis test, not a coin flip.)
+
 ## The monoidal contract (every module)
 
 - **identity** — a null/empty element + null op (empty jotter/arbor/dagger;
