@@ -785,3 +785,49 @@ Lightest first build when simmer is unratcheted: `simmer compile` (load rules �
 determinism check). One hand-rolled `step`; factor into per-object rules on sprawl; a
 rewrite-rule DSL only when raw Python rules get unwieldy. Claims keyed by id (body may
 be a source string) so arbor stays a mergeable semilattice without the DSL yet.
+
+### Goals/actions: a new hypothesis TYPE, and a two-root planning graph (spec)
+Working through what's genuinely new in ARC-AGI-3 vs prior abductor work on
+engineered systems: there, hypotheses were about MECHANICS ("is the world like
+this?", type *function* s,a→s') and the system defined success. Here success itself
+is hidden, so two more things become objects of hypothesis:
+- the **goal** — type *predicate* s→bool (what state wins)
+- the **action-as-means** — type *path/program* (which action advances the goal)
+Shift from hypothesizing *is* to also hypothesizing *what to want* and *how*. (Same
+action, two questions: action-as-effect = mechanic; action-as-purpose = plan.)
+
+**Three hypothesis types ↔ three gates (the symmetry that keeps it in the abductor):**
+- mechanic → gated against jotter's TRANSITION track (state deltas). Dense, exact
+  (determinism → Boolean kill).
+- goal → gated against jotter's SCORE track. A candidate goal_predicate is killed if
+  its true-flips don't align with recorded score increments. Same write-once abductor,
+  different column. Asymmetry: positives are SCARCE (few score events) but negatives
+  ABUNDANT (every non-scoring state must be excluded). So ruling out wrong predicates
+  is easy; GENERATING the right one from 2-3 positives is the hard part — where the LLM
+  prior is load-bearing (games want: reach exit / collect / align). Mechanics you
+  brute-force; goals you must guess well. This is why the reasoner must drive, not code.
+- plan → gated against simmer (does the decomposition reach the goal in imagination?).
+
+**Two roots = two inference directions (the planning graph).** dagger is two sources
+growing toward each other:
+- 'win' top-down = ABDUCTION: regress goal → subgoals (guess, sparse, score-gated),
+  predicate space. Frontier of *what I need to make true*.
+- 'act' bottom-up = DEDUCTION: push actions forward through mechanics → reachable
+  states (free in simmer, transition-gated, dense), state space. Frontier of *what I
+  can make true*.
+The PLAN is where they meet: a reachable state satisfies a leaf subgoal (bidirectional
+/ means-ends). Deduction is free → expand act-up hard, keep win-down shallow. arbor is
+the SHARED ALPHABET both are spelled in (act-step = a witnessed mechanic; win-entail
+checked through mechanics), NOT a third root. Both JIT (act-up from current state,
+win-down on miss).
+
+**Failure-to-meet is a router, not a dead end:** nothing reachable satisfies a subgoal
+→ re-abduce the goal; subgoals unreachable → spend piper to learn the missing mechanic;
+children achieved but parent won't fire → from-kill a better decomposition (this is the
+delayed/conjunctive credit-assignment hazard surfacing — score-jump cause may be
+upstream, e.g. a key grabbed 10 steps ago; trace via jotter's belief-provenance cone).
+
+Composition algebra (matches the monoidal contract): goal conjunction = commutative
+idempotent meet-semilattice (= the merge law); sequence = non-commutative action
+monoid. Peirce triad closes: abduce=win-down, deduce=act-up, induce=arbor's witness.
+PLAN.md "### goals and actions meet in the middle" added. Still spec; dagger deferred.

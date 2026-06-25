@@ -120,6 +120,31 @@ left blank/agent-driven by design (see WORKLOG). They use jotter's `diff` to com
 the surprise (piper ⊕ simmer) and arbor's CRUD to write claims. The cache laws make
 a loose consolidate converge anyway.
 
+### goals and actions meet in the middle (dagger)
+dagger is **two roots growing toward each other**, the two inference directions:
+- **'win' top-down = abduction** — regress the goal predicate into subgoal
+  predicates (a guess; needs the prior; gated against jotter's *score* track,
+  sparse). Grows the frontier of *what I need to make true*. Predicate space.
+- **'act' bottom-up = deduction** — push actions forward through arbor's mechanics
+  into reachable states (free in simmer; gated against the *transition* track,
+  dense). Grows the frontier of *what I can make true*. State space.
+
+The **plan is where the frontiers meet**: a reachable state satisfies a leaf
+subgoal, discharging a hypothesized subgoal into a verified path (bidirectional /
+means-ends search). Because deduction is free, expand act-up aggressively and keep
+win-down shallow. arbor is the **shared alphabet** both roots are spelled in (every
+act-step uses a witnessed mechanic; every win-entailment is checked through the
+mechanics), not a third root. Both stay JIT: act-up expands from the current state,
+win-down decomposes only on miss.
+
+A **failure to meet routes the agent** (the planning gap is a diagnostic, not a dead
+end): nothing reachable satisfies a subgoal → re-abduce the goal; subgoals
+unreachable → spend piper to learn the missing mechanic; children achieved but parent
+won't fire → `from-kill` a better decomposition. Goal predicates compose with the
+monoidal algebra already in the contract: conjunction (commutative idempotent =
+meet-semilattice = the merge law), sequence (non-commutative = the action monoid).
+(Peirce closes: abduce = win-down, deduce = act-up, induce = arbor's witness.)
+
 ## The monoidal contract (every module)
 
 - **identity** — a null/empty element + null op (empty jotter/arbor/dagger;
