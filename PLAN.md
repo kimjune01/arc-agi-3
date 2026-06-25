@@ -60,9 +60,31 @@ reconcile by running both and diffing.**
 ### simmer is compiled from arbor
 arbor holds the mechanic-claims (declarative); **simmer is their executable form** —
 the witnessed claims composed into a pure functional `step`. `arbor → simmer` is the
-compile. When the agent abduces a new claim into arbor, simmer recompiles. (Same
-knowledge, two paradigms: declarative claims in arbor, functional engine in simmer —
-four-schools' declarative↔functional pair.)
+compile (`arbor engine` folds the live, un-killed claims into `step`). When the agent
+abduces a new claim into arbor, simmer recompiles. (Same knowledge, two paradigms:
+declarative claims in arbor, functional engine in simmer — four-schools'
+declarative↔functional pair.)
+
+**The abductor IS the synthesizer; jotter's history IS the trial corpus.** A
+mechanic-claim's `--trial` is "replay jotter's recorded transitions through the
+candidate `step`"; `--kill-if` is "mispredicts any transition it claims to cover."
+So gating is free and deductive against history — piper is touched only to *grow* the
+corpus with novel transitions. Determinism licenses the Boolean gate: the game is a
+pure function of its action sequence, so one counterexample is a *definitive* kill,
+no thresholds, no statistics (exact regime). Granularity is per-object: a counter-
+example kills only the rule for the object the diff touches; `from-kill` writes the
+successor that covers it (gated against the *full* corpus, so it strictly dominates —
+the rule set climbs the semilattice monotonically), and the kill-edge records which
+transition broke it (jotter's belief-provenance, replayable).
+
+**Overfitting is avoided BY the abductor, not by a held-out split.** A memorizing/
+lookup rule is the maximally-overfit claim and dies first: the next novel `(s,a)` has
+no entry → mispredict → `kill`. Witness credence accrues only on transitions the rule
+hadn't seen (off-training-set by construction); `from-kill` forces generalizing
+successors. The live loop's novel transitions are a continuous falsification feed. The
+abductor gates and composes; it does **not** invent — the candidate rule body is the
+agent's abductive leap from the red diff (reasoner attends+abduces, harness
+holds+gates).
 
 ### jotter is multi-track provenance, not just a frame-log
 

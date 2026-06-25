@@ -753,3 +753,35 @@ refs a claim to mean *this action tests it* (motivation, forward); a git NOTE re
 the same claim to mean *it is believed because of evidence E* (justification,
 backward). Same node, opposite provenance direction — `jotter why` walks either way.
 CLI sketch gains `[--for arbor:#<id>|dagger:<id>]` on commit. PLAN.md updated.
+
+### simmer synthesis: abductor writes the game, jotter history is the test corpus
+Settling how code gets into simmer (still deferred; spec). The pipeline closes:
+jotter (tests) → abductor/arbor (gate+compose) → simmer (`step`). Key moves:
+
+- **jotter's grounded-facts track IS the test suite.** Every recorded (s,a)→s' is a
+  golden test; `piper ⊕ simmer` is the test runner. A mechanic-claim's abductor
+  `--trial` = replay the corpus through the candidate `step`; `--kill-if` = mispredicts
+  any covered transition. Gating is free/deductive against history; piper is touched
+  only to GROW the corpus with novel transitions.
+- **Determinism licenses the Boolean gate.** Game = pure fn of its action sequence
+  (measured LS20), so one counterexample is a definitive kill — no thresholds, no
+  statistics. Why the write-once abductor is the right tool, not a statistical fitter.
+- **Per-object granularity → surgical kills.** A counterexample kills only the rule
+  for the object the diff bbox touches; `from-kill` writes the successor, gated against
+  the FULL corpus (strictly dominates → monotone climb up the semilattice). The kill-
+  edge records which transition broke it = belief-provenance lineage, replayable.
+- **Overfitting is avoided BY the abductor** (the user's point), no held-out split
+  needed. A lookup/memorizing rule is the maximally-overfit claim and dies first: the
+  next novel (s,a) has no entry → mispredict → kill. Witness credence accrues only on
+  unseen transitions (off-training-set by construction); from-kill forces generalizing
+  successors. Live novel transitions = a continuous falsification feed (Popper).
+- **Division of intellect holds:** abductor gates+composes (`arbor engine` folds live
+  claims into `step`), does NOT invent — the candidate rule body is the agent's
+  abductive leap from the red diff. Later the abductor could enumerate candidates if
+  the agent's proposals get rote (ratchet step, not now).
+
+Lightest first build when simmer is unratcheted: `simmer compile` (load rules → step)
++ `simmer test` (replay jotter corpus, per-transition verdict like restore's
+determinism check). One hand-rolled `step`; factor into per-object rules on sprawl; a
+rewrite-rule DSL only when raw Python rules get unwieldy. Claims keyed by id (body may
+be a source string) so arbor stays a mergeable semilattice without the DSL yet.
