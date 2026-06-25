@@ -174,6 +174,58 @@ monoidal algebra already in the contract: conjunction (commutative idempotent =
 meet-semilattice = the merge law), sequence (non-commutative = the action monoid).
 (Peirce closes: abduce = win-down, deduce = act-up, induce = arbor's witness.)
 
+### composability: pre/post matching is an INDEX over simmer, not the model
+The DAG composes by matching postconditions to preconditions (B's precond ⊨ A's
+postcond). Classically this is *the* hard part because the conditions ARE the model: no
+simulator, so they bear the frame problem, a condition DSL, and soundness all at once.
+Here simmer dissolves all three — the action's real model is the executable `step`, so
+conditions are an **index over simmer, not ground truth**. The frame problem vanishes
+(simmer carries the whole state forward); a wrong condition costs a wasted rollout, not
+a broken plan (execution verifies, so the index may be approximate); the vocabulary is
+the predicate language arbor's mechanic-claims and the win-down goal predicates already
+use (no fresh DSL). Determinism makes postconditions exact; object-locality makes them
+small object-relative patterns (local frame problem trivial, binding = the object
+`objects` extracted); the corpus grounds them (`precond(a→E)` = the common object-local
+pattern over states where `a` produced `E`, abduced and kill/from-kill-refined like any
+mechanic). Pre/post matching is the **connective tissue of the two roots**: postconds
+index the act-up frontier, preconds index the win-down regression, the match is how they
+meet symbolically before paying a rollout (simmer then discharges it into a verified
+path).
+
+**Soft prose typing first (ratchet).** Start pre/post as PROSE strings; the match is the
+LLM's semantic judgment ("does 'block left-aligned' satisfy 'block adjacent to wall'?").
+No DSL, no subsumption engine. Safe because conditions only index simmer — a wrong prose
+match is a wasted rollout, not a broken plan, so the reasoner is *allowed* to be sloppy
+and you learn whether pre/post composition is even the right frame before building
+machinery. Harden later: a corpus of prose conditions + which matches simmer verified
+true makes the recurring structure visible, and you abduce the structural pattern
+language FROM the prose (learned, not authored) — same path as simmer's prose-claims →
+executable-form. Then matching is three cheap pieces: *propose* (structural subsumption
+over object-local atom conjunctions — set-containment, not FOL), *verify* (run the chain
+in simmer; free, exact), *learn* (abduce conditions from the corpus; JIT-on-miss caches a
+forward-searched fragment as a new node).
+
+**Exhaustive children = the composability law on decomposition.** Ideally a node's
+children exhaustively fulfill it: `compose(children) ⊨ parent` (conjunction unordered,
+sequence ordered) — decomposition and composition are inverse, exhaustiveness is the
+round-trip fidelity. Don't *prove* it, TEST it: achieve all children in simmer, check the
+parent's goal predicate fires. Fires → exhaustive (for that instance); doesn't → the
+residual is localized (which parent predicate is still false), so abduce exactly the
+missing child and `from-kill` the decomposition with it. That's the "children achieved
+but parent won't fire" router: it IS a non-exhaustive decomposition, and the gap names
+the next child, so exhaustiveness converges. This is also the coverage/usefulness metric
+(beyond kill-on-mispredict): a decomposition's worth = does it exhaustively fulfill the
+parent. Sufficiency is soundness; minimality (no redundant child) is a separate
+efficiency property the budget/RHAE pressure handles on its own.
+
+Residual hardness is a performance knob, not a wall: a relational/global precondition
+falls outside the object-local language → index miss → fall back to plain simmer search
+(correct, slower); object identity across frames degrades the index, never the result
+(simmer is grid→grid, needs no correspondence). Three commitments turn the classical wall
+into a knob: conditions **index** simmer (never model it), conditions are **prose-first
+then corpus-abduced** (never hand-authored upfront), the DAG is a **JIT cache of verified
+fragments** (never a from-scratch sound planner).
+
 ## The monoidal contract (every module)
 
 - **identity** — a null/empty element + null op (empty jotter/arbor/dagger;

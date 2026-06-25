@@ -916,3 +916,41 @@ perception.py; formalizing them is the target JSON contract, premature per the r
 revisit when piper's CLI output contract is actually adopted); defer/cut the cognitive
 modules (= the ratchet restated, already the plan). Lean kept: bold, codex is sparring
 not arbiter.
+
+### dagger composability: pre/post matching feasible as an INDEX over simmer (spec)
+June flagged he struggled hard with pre/post-condition matching last time. Diagnosis:
+classically the conditions ARE the model (no simulator), so they carry the frame
+problem + a condition DSL + soundness all at once, and must be complete/correct before
+useful. That's the wall. Here simmer dissolves it: the action's real model is the
+executable `step`, so conditions are an INDEX over simmer, not ground truth. Frame
+problem vanishes (simmer carries full state); a wrong condition = a wasted rollout, not
+a broken plan (execution is the verifier, index may be approximate); vocabulary is the
+existing arbor/goal-predicate language (no fresh DSL). Determinism → exact postconds;
+object-locality → small object-relative patterns (binding = `objects`); corpus grounds
+them (precond(a→E) = common object-local pattern over states where a produced E, kill/
+from-kill-refined). Pre/post matching is the connective tissue of the two roots:
+postconds index act-up, preconds index win-down, the match is how they meet before a
+rollout (simmer discharges it into a verified path).
+
+Two refinements June added:
+- **Soft prose typing first** (ratchet). Conditions as prose; match = LLM semantic
+  judgment; no DSL. Safe because conditions only index simmer (wrong match = wasted
+  rollout). Harden later by abducing the structural pattern language FROM the accumulated
+  prose+simmer-verified matches (learned, not authored) — same path as simmer's prose→
+  executable. Hot path then: propose (subsumption over object-local atoms, not FOL) /
+  verify (simmer) / learn (corpus abduce; JIT cache forward-searched fragments).
+- **Exhaustive children = composability law on decomposition.** compose(children) ⊨
+  parent (round-trip fidelity of decompose∘compose). Don't prove it, TEST it: achieve
+  all children in simmer, check the parent predicate fires; a gap is localized (which
+  predicate still false) → abduce the missing child, from-kill the decomposition. This
+  IS the "children achieved but parent won't fire" router; exhaustiveness converges, and
+  it's the coverage metric codex wanted. Sufficiency = soundness; minimality = separate
+  efficiency (RHAE handles it).
+
+Feasibility verdict: yes, substantially more than the classical attempt, under three
+commitments that turn the wall into a knob — conditions INDEX simmer (never model it),
+prose-first then corpus-abduced (never hand-authored), DAG is a JIT cache of verified
+fragments (never a from-scratch sound planner). What bit him before was building a
+standalone sound symbolic planner. Inputs for a de-risk experiment already exist
+(`objects` + `diff` + a transition corpus) if he wants to prove prose-typed matching
+ahead of building dagger. PLAN.md "### composability" added. dagger still ratchet-deferred.
