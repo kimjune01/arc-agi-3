@@ -709,3 +709,33 @@ that's pure, composable, replayable, transferable.
   GAMESESSION → iterate the jar). 14 offline tests pass.
 - Live: random agent scores 0; Claude policy drives real actions via
   subscription; `arcg` plays LS20 end-to-end.
+
+### Milestone 0: `objects` — the one unambiguous build (committed 6903641)
+Brief was "build everything that's unambiguous." The plan gates jotter/arbor/
+simmer/dagger behind the ratchet (codify only when the in-head version visibly
+breaks), leaves the driver name Open/TBD, and the arcg→piper rename is a real
+decision (the target piper surface pushes move/snapshot/notes into other modules;
+touches the package dir, console-script, AGENT.md, test_layering). So none of those
+are unambiguous. The ONE thing that was: Milestone 0 step 1's piper checklist —
+"act/look/diff/snapshot/restore + undo + objects" — had everything but `objects`
+(undo was already wired via layer1_intent.undo/ACTION7).
+
+Built `arcg objects` = connected-component spatial-edge perception (the figure/
+ground primitive the plan calls "edge detection"):
+- `perception.find_objects/GridObject/describe_objects` — flood-fill segmentation
+  (4-conn default, 8 via --diag), modal colour treated as background and excluded
+  (--with-bg keeps it). Written in the diff_grids/Delta style.
+- `layer1_intent.objects` — free perception verb beside look/diff (reads the stored
+  frame; no action, no budget). Names "the 12-block" instead of raw cells.
+- Magnitude-honest output (caps at 40, "+N more"); doesn't judge — background is
+  excluded but recoverable, nothing hidden (CLI convention #1).
+- 5 new tests; 27 pass. Smoke-tested on a synthetic LS20 grid: background 4 auto-
+  excluded, UI bar (5) / avatar block (12) / two scattered 9-tokens each surfaced.
+
+Harness note: the project's autoenv hook prompts y/n/d on `.env` for every `cd`
+into the repo and blocks non-interactive shells (it ate a heredoc commit message's
+stdin). Use `git -C <path>` / absolute paths, no `cd`.
+
+Open (unchanged, by design): driver name; arcg→piper rename; explainer prompt
+(partly served by AGENT.md — the dedicated "map" version per §Onboarding is next if
+wanted). jotter/arbor/simmer/dagger stay deferred until observed to break.
