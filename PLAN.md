@@ -72,17 +72,25 @@ jotter records the full trajectory, in tracks split by **integrity class**:
 - **belief-provenance** — WHY each claim was believed (the surprise that triggered
   the abduction, the trial that witnessed it). Prose, TRUSTED not replayable; links
   to arbor's claims. (This is also the dependency cone collapse-and-rebuild needs.)
-- **action-provenance** — WHY each action was taken (the decision rationale).
+- **action-provenance** — WHY each action was taken. The commit message is just
+  the reason, ideally a typed ref to the arbor claim it tests or the dagger node it
+  executes (so the action edge walks back into smem/pmem); free prose only for
+  undirected probes. Not a restatement of the action — the action token is commit
+  metadata, the tree is the fact.
 
 The line is the hygraph paper's: the mechanical skeleton (grounded facts) is
 checkable; the prose (the two rationale tracks) is what an auditor would otherwise
 have to trust. Recording the *why* is the reasoning agents normally discard, and
 what cons's *attend* consolidates. git carries all three for free: commit **tree** =
 grounded fact, commit **message** = action rationale, git **notes** = belief
-rationale (attached without changing the content hash).
-CLI sketch: `jotter commit --action <a> --why "<rationale>"`, `jotter believe
-<claim-id> --because "<reason>"`, `jotter log --track facts|beliefs|actions`,
-`jotter why <state-hash|claim-id>`.
+rationale (attached without changing the content hash). The two rationale tracks
+both touch arbor but in opposite directions: a commit **message** refs a claim to
+say *this action tests it* (motivation, forward); a git **note** refs the same claim
+to say *it is believed because of evidence E* (justification, backward). Same node,
+opposite provenance direction — so `jotter why` can walk either way.
+CLI sketch: `jotter commit --action <a> --why "<reason>" [--for arbor:#<id>|dagger:<id>]`,
+`jotter believe <claim-id> --because "<reason>"`, `jotter log --track
+facts|beliefs|actions`, `jotter why <state-hash|claim-id>`.
 
 ### Where consolidation lives
 There is no separate consolidator module: the **driver + the agent (LLM)** do it,

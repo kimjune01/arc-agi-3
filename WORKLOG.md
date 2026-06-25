@@ -739,3 +739,17 @@ stdin). Use `git -C <path>` / absolute paths, no `cd`.
 Open (unchanged, by design): driver name; arcg→piper rename; explainer prompt
 (partly served by AGENT.md — the dedicated "map" version per §Onboarding is next if
 wanted). jotter/arbor/simmer/dagger stay deferred until observed to break.
+
+### jotter commit message = the reason, as a typed ref into arbor/dagger (spec)
+Refining the action-provenance track (jotter still deferred; spec only). The git
+commit message is JUST the reason the action was taken — not a restatement of the
+action (that's commit metadata) and not the resulting state (that's the tree).
+Ideally the reason is a typed ref: `arbor:#4` (the claim this action tests) or
+`dagger:<id>` (the plan node it executes), so the action edge walks back into smem/
+pmem instead of being dead prose. Free prose only for undirected probes.
+
+Clean distinction so the two arbor-touching tracks don't blur: a commit MESSAGE
+refs a claim to mean *this action tests it* (motivation, forward); a git NOTE refs
+the same claim to mean *it is believed because of evidence E* (justification,
+backward). Same node, opposite provenance direction — `jotter why` walks either way.
+CLI sketch gains `[--for arbor:#<id>|dagger:<id>]` on commit. PLAN.md updated.
