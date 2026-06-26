@@ -200,3 +200,27 @@ primitive-API leaves). High confidence. Best build path BANKED for when prose da
 Honest size: fork-and-extend, ~few hundred lines (node store + resolver + GTPyhop adapters),
 NOT drop-in. Build only when prose dagger (DAGGER.md) visibly goes off the rails — it didn't
 this run.
+
+## 2026-06-25 — DAGGER.md: uncertainty, champion/challenger, e-values
+
+Extended DAGGER.md's soft typing with how uncertainty is handled (all prose, no machinery):
+- **Express uncertainty as status + the trial that settles it, never a probability.** Each
+  uncertain element carries: conjecture-marked prose; a security status (untested → witnessed×N
+  → killed, arbor's vocabulary, credence by set-add-of-trials not `++`); and the discriminating
+  trial + cost class (free=simmer/reachability, paid=piper/state, unmodellable). Forcing
+  function: no nameable trial → not a usable hypothesis. The annotation IS the node's
+  uberty→security position.
+- **Why not champion/challenger A/B (June's prior impl, "rather expensive").** It pays to
+  evaluate challengers speculatively; expensive for 3 reasons this setting removes —
+  nondeterminism→statistics (here deterministic→n=1 kill), expensive feedback→real runs (here
+  simmer→free comparison), no simulator (here simmer IS it). dagger keeps ONE champion, runs
+  only it, surprise nominates the challenger (from-kill, strictly dominating, gated free vs the
+  corpus). Survives only as a rare paid probe for a state-effect a long plan depends on.
+- **The Boolean kill is a degenerate e-value test** (June's prior used e-values vs champion-as-
+  null with implicit hill-climbing). A deterministic champion assigns prob 1, so one mispredict
+  sends the test martingale to ∞ at n=1 — anytime-validity for free, threshold irrelevant.
+  e-values genuinely earn their keep only on the sparse/paid GOAL layer (score many-to-one,
+  delayed), where optional stopping promotes a goal-decomposition on the fewest paid actions.
+  Surprise-driven climb beats perturbation hill-climb: ∞-size steps where deterministic, and
+  counterexample-generated (not perturbation-generated) challengers escape local optima.
+  Banked for arbor (witness/credence ledger) when prose status can't discriminate; not built.
