@@ -336,10 +336,23 @@ to the sound DP version (no graded apparatus, no GRADES.md pointer). Kept only t
 takeaway: it's DP; admissibility = resource-constrained shortest-path; certificate = finite
 cost bound ≤ budget.
 
-Next direction under discussion (not built): the hypothesis generator as **scale-free,
-boundary-conditioned relational pattern inference** over jotter's past operations (object-local
-patterns, translation/scale/grid-size invariant → game-agnostic; mechanic patterns are local &
-scale-free = deducible, non-local effects = goal/terminal = must-witness). June frames the
-heuristic vocabulary via **Pólya** (working-backwards = win-down, "related problem"/analogy =
-the scale-free retrieval, decomposition = dagger, look-back = write-back, specialization =
-simmer-test, generalization = the scale-free rule). To be reviewed before any build.
+Next direction (not built; codex-reviewed). Hypothesis generator = **object-centric relational
+transition schema induction** (codex's name; "scale-free" was an overclaim — it's translation/
+size *equivariance*, not scale-freedom). Mine jotter's operations for `(action, local object
+role, boundary predicate) → delta` schemas, matched on relations (adjacency/containment/
+alignment/nearest-in-direction), with support/counterexample/confidence.
+- **Cleavage DEBUNKED**: local/equivariant ≠ deducible, non-local ≠ must-witness (a local
+  button can reset the board; "mirror the board" is global yet deducible). The real free/paid
+  criterion is **model coverage / uncertainty**, NOT spatial locality — locality is only a
+  *risk prior*. Same error shape as the graded `m*=∞` debunk: stop tying an epistemic boundary
+  to a structural property. The free/paid line is model-coverage, full stop.
+- **Pólya** is mostly decoration unless compiled into control policy (the LLM already does the
+  verbal moves). Three worth making first-class: analogy/related-problem retrieval by relational
+  fingerprint, specialization→generalization (test then anti-unify, counterexamples specialize),
+  working-backward regression. Rest stays with the LLM.
+- Prior art to lift: OO-MDP / relational RL (closest), ILP / version-space anti-unification, SME
+  retrieval, CBR first; avoid full ILP / broad DSL / DreamCoder / EURISKO now.
+- Minimum: object-relation graph per state + stored transitions (frame + terminal) + simple
+  schema mining + uncertainty-gated piper escalation. Trigger to mechanize: LLM repeats
+  trace-inspection across games / a transition recurs 3–5× with role variation / bad guesses
+  waste piper / need confidence accounting the LLM can't hold. Until then in-head is fine.
