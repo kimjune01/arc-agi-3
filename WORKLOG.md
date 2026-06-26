@@ -82,3 +82,21 @@ side** — score stayed 0/7, straight navigation doesn't score, win condition un
 the next module-break will come from win-down/goal decomposition (dagger / arbor's
 goal-claims), not from perception or mechanics. Confirmed by driving, not guessed: arbor
 and dagger stay ratchet-deferred until a real run-to-score taxes the in-head goal model.
+
+## 2026-06-25 — templated-prior idea: energy-bar premise tested + falsified (free peek)
+
+Floated: if the energy bar recurs in every game, provide it as a templated module.
+Tested the premise with free `objects` peeks at ft09/vc33/cd82 (0 budget). Result:
+- ft09, cd82: **no colour-11, no bar.** vc33: colour 11 present but as small vertical
+  blocks (6×2, 4×2), **not** a bottom strip — 11 means a different object there.
+- **Colour is not a stable cross-game key**: background runs 4/5/3 across these games;
+  11 = energy bar in LS20 but tokens in vc33. A colour-keyed template would mis-fire.
+- **The universal abstraction we already have**: every game has a move limit, and piper
+  already meters it (`actions_spent`/budget cap). The LS20 11-bar is just an on-board
+  *rendering* of that counter — redundant with piper. Nothing to template.
+
+Decision: no energy-bar module. The bestiary idea (recurring primitives →
+`(recognizer, default-mechanic, default-role)` seeded as KILLABLE defaults to cheapen
+cold-start — pre-loaded uberty, hypothesis side per the poka-yoke boundary) is sound,
+but must key on STRUCTURE/geometry not colour, and the trigger is re-deriving the same
+structural primitive in a 2nd game. n=1 on every primitive so far; deferred.
