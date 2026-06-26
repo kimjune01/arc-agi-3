@@ -159,3 +159,44 @@ monoidal-contract composition insight to land the ONE invariant:
 Grounded in the observed LS20 loop: `deposit = collect-token ; route-to lock ; overlap-lock`,
 `route-to` the shared sub-action, ×7 = the win. Deferred: DSL, subsumption engine, proving
 (vs testing) the invariant, object-identity, minimality.
+
+## 2026-06-25 — dagger typing tried on a drive (run3) + drop-in research (codex)
+
+**Observed drive planning in the dagger frame (run3).** Fresh subagent, read DAGGER.md as
+its planner. Scored 1/7 (30 budget; level-2 was budget-locked at a 37-move optimum with 27
+left — unwinnable, not a frame failure). The typing EARNED ITS KEEP: on level 2 the driver
+deliberately omitted `collect-token`, achieved `route-to-lock ; overlap-lock`, and the
+parent predicate (`score += 1`) did NOT fire. The diagram failed to commute; the residual
+localized to `overlap-lock`'s precond "carried matches lock" = false; the gap **correctly
+named the missing child = collect-token**. Exactly the catch-and-name-the-repair the
+commuting-factorization invariant was built for.
+
+**Typing limit surfaced (first hardening candidate).** `compose(children) ⊨ parent` is only
+FREE when a postcondition is a reachability predicate (simmer-checkable). For a
+collectible-STATE postcondition ("carried matches lock", a HUD predicate simmer can't see),
+the check degrades to "verify in piper" (costs budget). Cheap fix WHEN IT RECURS: a one-bit
+annotation per pre/post — `reachability-checkable` vs `state-checkable` — so the planner
+knows in advance which entailments are free vs budget-bearing. Not built (ratchet).
+
+**Reconciliation caught a driver blind spot (observability working).** Driver claimed "no
+new mispredicts" — true for avatar reachability (its routes landed as simmer predicted), but
+`simmer test` on the full corpus is 10/30: 20 misses are ONE bug — after a level-regen the
+new level has a SECOND colour-11 object (vertical segment rows 16-18 col 15), so
+`_deplete_bar` (remove leftmost 11-column) depletes the wrong region every post-regen move.
+Reachability-irrelevant (avatar unaffected, drive unharmed), so the self-report missed it;
+the objective trace did not. Deferred engine note: the bar model is single-bottom-bar-only;
+the bar is redundant with piper's budget anyway, so fixing it is low-value.
+
+**Drop-in research (codex). No usable implementation of the full compound exists** (persistent
+similarity-indexed HTN/DAG + LLM-JIT decomposition on miss + write-back + self-healing +
+primitive-API leaves). High confidence. Best build path BANKED for when prose dagger breaks:
+- **GTPyhop** (Dana Nau, BSD, actively packaged on PyPI) = the HTN/goal-task recursive
+  resolver; already supports mixed tasks/goals with Python-function operators + leaves.
+- **Voyager `SkillManager`** (MIT; Chroma + embedding retrieval + write-only-after-success)
+  = the persistent similarity-indexed layer; swap "skill = JS code" → "node = {intent, pre,
+  post, mode, children, primitive?}".
+- **ChatHTN verifier-tasks** (Muñoz-Avila et al., Apache-2.0, built on PyHop) = donor for the
+  `compose(children) ⊨ parent` check.
+Honest size: fork-and-extend, ~few hundred lines (node store + resolver + GTPyhop adapters),
+NOT drop-in. Build only when prose dagger (DAGGER.md) visibly goes off the rails — it didn't
+this run.
