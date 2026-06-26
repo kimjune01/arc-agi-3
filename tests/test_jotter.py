@@ -27,6 +27,30 @@ def test_dedup_and_transposition():
     assert state_hash(C) in m.transpositions()  # reached >1 way
 
 
+def _bar_grid(bar_cols, pickup=True):
+    """8x8: avatar top-left, an optional maze pickup (small 11, high up), a bottom bar."""
+    g = np.full((8, 8), 3, np.int16)   # corridor
+    g[0, 0] = 12                        # avatar
+    if pickup:
+        g[3, 3] = 11; g[3, 4] = 11     # energy pickup (kept)
+    for c in bar_cols:
+        g[7, c] = 11                   # bottom energy bar (masked)
+    return g.tolist()
+
+
+def test_canonical_hash_ignores_bar_depletion():
+    # same place, different move-counter (bar depleted two columns -> they read as corridor)
+    full = _bar_grid([1, 2, 3, 4, 5])
+    depleted = _bar_grid([3, 4, 5])
+    assert state_hash(full) == state_hash(depleted)
+
+
+def test_canonical_hash_keeps_pickup():
+    # collecting a maze pickup IS salient — must change the hash
+    assert state_hash(_bar_grid([1, 2, 3, 4, 5], pickup=True)) \
+        != state_hash(_bar_grid([1, 2, 3, 4, 5], pickup=False))
+
+
 def test_revisit_detection():
     A, B = _g(1), _g(2)
     m = EpMem()

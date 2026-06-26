@@ -9,10 +9,58 @@ from pathlib import Path
 import numpy as np
 
 
+CORRIDOR = 3
+BAR = 11      # the energy bar (a monotone move-counter)
+LIVES = 8     # the lives counter (also monotone)
+_MASK = -1    # sentinel for canonicalised-out cells (value irrelevant, only that it's constant)
+
+
+def _components(arr: np.ndarray, color: int) -> list[list[tuple[int, int]]]:
+    """4-connected components of `color`, each a list of (y, x) cells."""
+    h, w = arr.shape
+    seen = np.zeros(arr.shape, bool)
+    out: list[list[tuple[int, int]]] = []
+    for sy in range(h):
+        for sx in range(w):
+            if seen[sy, sx] or arr[sy, sx] != color:
+                continue
+            stack = [(sy, sx)]; seen[sy, sx] = True; cells = []
+            while stack:
+                y, x = stack.pop(); cells.append((y, x))
+                for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    ny, nx = y + dy, x + dx
+                    if 0 <= ny < h and 0 <= nx < w and not seen[ny, nx] and arr[ny, nx] == color:
+                        seen[ny, nx] = True; stack.append((ny, nx))
+            out.append(cells)
+    return out
+
+
+def _canonical(grid) -> np.ndarray:
+    """Project out the on-board move-counters before hashing.
+
+    The energy bar (colour 11) loses one column per move and refills on reset, so hashing the
+    raw grid makes every state spuriously unique — defeating revisit/transposition detection
+    (run4: the avatar reset to level-start ~11x, every one reported as novel). Mask the bar's
+    whole ROW BAND, not just its live cells: the depleted columns read as corridor (3), so the
+    band must include 3 to stay invariant under depletion. The bar is the BOTTOMMOST 11-
+    component (maze 11-clusters are energy pickups, higher up — salient state, kept). The lives
+    counter (colour 8, in the same band) is masked too, so a reset (which decrements it) still
+    matches level-start. LS20-specific by design; widen when a second game needs it.
+    """
+    arr = np.asarray(grid, dtype=np.int16).copy()
+    comps = _components(arr, BAR)
+    if comps:
+        bar = max(comps, key=lambda c: max(y for y, _ in c))   # bottommost = the bar
+        for y in {y for y, _ in bar}:
+            row = arr[y]
+            row[(row == BAR) | (row == CORRIDOR) | (row == LIVES)] = _MASK
+    return arr
+
+
 def state_hash(grid) -> str:
-    """Stable short id for a state = hash of its grid. Identical grids → same id."""
-    arr = np.asarray(grid, dtype=np.int16)
-    return hashlib.sha1(arr.tobytes()).hexdigest()[:10]
+    """Stable short id for a state = hash of its CANONICAL grid (move-counters projected out,
+    so the same place revisited hashes identically). See `_canonical`."""
+    return hashlib.sha1(_canonical(grid).tobytes()).hexdigest()[:10]
 
 
 class EpMem:

@@ -242,3 +242,44 @@ uberty source), and freeness isn't what makes a mode uberty. Fixed PLAN.md §ube
 = node status; cost = the trial's separate free/paid class). Bench upshot, restated correctly:
 ARC-AGI-3 meters *induction* and leaves abduction+deduction free — sample-efficiency is
 inductive-efficiency (fewest witnesses to ground a model free deduction can then run on).
+
+## 2026-06-25 — deep drive (run4) + jotter canonical hash (revisit blindness fixed)
+
+**Deep drive, budget 100 (run4).** Scored 1/7, stopped at a real budget-lock on level 2.
+Watched it LIVE via the game trace (not the subagent transcript) and reconciled after.
+- **Mystery the live trace posed, the drive solved.** Trace showed the avatar stuck in an
+  18-cell box, cell (35,29) hit 11x — looked like aimless thrashing. It wasn't: the energy
+  bar is not a soft counter, it **resets the avatar to level-start, refills the bar, and
+  spends one of 3 lives** (colour-8 counter 12→8→4) when it depletes (~21 moves/life). The
+  "circling" was repeated forced resets to start. The trace localized the symptom; active
+  play found the mechanism.
+- **11 is an ENERGY PICKUP, not a wall.** Maze 11-clusters refill the bar on overlap (no life
+  lost). simmer had 11 as wall, so every BFS route avoided them → level 2 looked infeasible.
+  The drive hand-edited `engine.py` PASSABLE += 11 (witnessed; run1 still 3/3, 38 tests pass,
+  0 avatar-position regressions — verified independently). This IS a piper⊕simmer surprise
+  (predict blocked, reality moved+refilled), abduced and compiled by hand — the abductor loop.
+- **Goal-layer answer to "is it using mechanical XOR":** for the MECHANIC layer yes (the
+  11-pickup was a reachability surprise the XOR catches). For the RESOURCE constraint the XOR
+  is structurally SILENT — simmer predicted every avatar position correctly, so piper⊕simmer=0
+  across all 62 stuck moves; the reset/lives mechanic cost ~20 paid piper actions to reverse-
+  engineer. The mechanic layer has a detector; the goal layer has none.
+- **Prose dagger held** — every uncertainty was a Boolean kill, no e-value/credence needed
+  (e-value layer stays banked). The real off-rails signal is SCOPE: dagger types per-node
+  pre/post but has no slot for a whole-SEQUENCE resource budget (route-length vs energy). That
+  is the next typing question — a resource gate on a composite (monoid-sum of step costs ≤
+  budget), distinct from pre/post matching. Drive's build-next: (1) resource-budget child on
+  the route node + pickups as mandatory waypoints when route_len > bar, (2) model bar/lives in
+  simmer, (3) approach-rotation operator on the deposit predicate (HUD match is rotation-
+  dependent on approach direction).
+
+**jotter canonical hash (fixes the revisit blindness this drive exposed).** The state hash was
+over the raw grid, so the monotone bar made every state unique → `revisits/transpositions`
+could never fire (jotter was blind to the very thrashing above; confirmed live: same avatar
+cell → 3 distinct hashes). Fix: `state_hash` now hashes a CANONICAL grid — mask the bar's whole
+row band (the bar is the bottommost 11-component; include corridor-3 since depleted columns
+read as corridor; mask the colour-8 lives counter in that band too so a reset matches level-
+start). Pickups (small 11, higher up) kept as salient. Payoff: run4 79→39 unique states,
+0→18 revisits, 0→2 transpositions; runs 1–3 surfaced 1–2 hidden reconvergences; 38→40 tests.
+The ~20 actions the drive spent reverse-engineering the reset would have been a free "I'm back
+at level-start" revisit signal with this in place — induction made cheap by better content-
+addressing. LS20-specific by design (widen at game 2).
