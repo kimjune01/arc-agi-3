@@ -135,3 +135,27 @@ the collect→match→deposit loop ×7 is a clean fixed decomposition, and the b
 path-length vs budget (level 2's token/lock were each ~17 moves off). That's the in-head
 planner visibly breaking — the ratchet trigger for dagger. arbor still not forced (few
 claims, held fine in notes/head).
+
+## 2026-06-25 — dagger typed loosely (DAGGER.md), the composition invariant
+
+Wrote `DAGGER.md`: dagger's soft-typing pass (prose, no type system; formal typing
+deferred until prose goes off the rails, per standing call). Combined Winston (6.034 goal
+trees / problem reduction; "the right representation exposes the constraint") with the
+monoidal-contract composition insight to land the ONE invariant:
+
+- **node = morphism** (perspectival: goal-from-above = postcondition/codomain,
+  action-from-below = state transformation). The blog's "every node is a goal from above
+  and an action from below" *is* an arrow.
+- **decomposition = commuting factorization**: `compose(children) ⊨ parent`. Decompose and
+  compose are inverse; exhaustiveness is round-trip fidelity; a lossy decomposition is a
+  diagram that doesn't commute. `compose` = action monoid (sequence, ordered) or
+  meet-semilattice (conjunction, the merge law).
+- **composition = codomain-meets-domain**: `A;B` iff `post(A) ⊨ pre(B)` — the categorical
+  composability condition, which is exactly pre/post matching.
+- pre/post are PROSE, `⊨` is judged (LLM, sharpened by simmer), the invariant is TESTED by
+  running children in simmer and checking the parent predicate fires — the non-commutation
+  names the missing child (`from-kill`). Two roots meet at the commuting square.
+
+Grounded in the observed LS20 loop: `deposit = collect-token ; route-to lock ; overlap-lock`,
+`route-to` the shared sub-action, ×7 = the win. Deferred: DSL, subsumption engine, proving
+(vs testing) the invariant, object-identity, minimality.
