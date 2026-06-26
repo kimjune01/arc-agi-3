@@ -1148,3 +1148,37 @@ killed/witnessed + provenance), a claim's executable form just REFERENCES the en
 prerequisite, may never be needed. Retracts the prior entry's "compile instead of hand-edit"
 as the end state. PLAN.md "### simmer is compiled from arbor" → "### simmer is the agent's
 hand-edited engine".
+
+### jotter BUILT (MVP) — content-addressed state graph; ratchet fired because simmer arrived
+The ratchet fired for a concrete reason: simmer gave jotter a CONSUMER. simmer predicts the
+next state; jotter answers "seen this state before?" Together = budget optimality (the "novel"
+half of novel∩surprising) — which had no mechanism until simmer existed. Plus the transitions
+corpus piper records IS jotter's grounded-facts track waiting to be content-addressed.
+
+MVP = content-addressed state graph over the corpus (NOT git — git buys branches/merge/notes,
+still deferred; the value now is state identity + dedup, which needs no git):
+- `jotter/graph.py` — `state_hash(grid)` (sha1 of the grid → short id; identical grids →
+  same node), `EpMem` (states deduped by content, edges keyed by (from,action),
+  transpositions = states reached >1 way, revisits = genuine returns on the visited sequence).
+- `jotter/cli.py` — `stats / log / show <hash> / graph / has <hash>` (exit 0=known, 3=novel)
+  over `$ARCG_STATE_DIR/transitions.jsonl`. Console script registered.
+- 4 tests (hash stability, dedup+transposition, revisit, has); 37 total pass.
+
+Live on the LS20 sim corpus: 4 transitions → 5 unique states, 4 edges, 0 transpositions
+(linear), 0 revisits. Synergy demo: simmer.step predicts the next state → jotter.has(hash) →
+"KNOWN (skip piper, free)" for a corpus state, "NOVEL (worth a piper act)" for a fabricated
+one. That's never-re-query made concrete.
+
+Bug caught + fixed mid-build: first `revisits` counted chain joints (after_i==before_{i+1})
+as returns → reported 3 on a linear path; fixed to count the visited-state sequence → 0.
+Deferred (per ratchet): git substrate, branches/merge, the belief/action provenance tracks,
+motive-refs on commits (the driver isn't recording motives yet — that's me reasoning in-head).
+
+**Audit counter (June's ask): jotter reconciles against piper via budget stamps.** piper now
+stamps each transition with its action counter (`spent`); jotter tallies and `jotter audit`
+checks: stamps gapless (== every action recorded, no drops), count == last stamp (no
+drop/dup), and — if the session is live — actions_spent == transition count. The stamp lives
+in the CORPUS, so the audit SURVIVES session end (verified: after `arcg end` deletes
+session.json, `jotter audit` still confirms `1..3 gapless ✓` from the stamps alone). This is
+the grounded-facts integrity check the plan promised (facts are VERIFIABLE): a gap means a
+piper action went unrecorded. +1 test (gapless vs injected-gap); 38 total pass.

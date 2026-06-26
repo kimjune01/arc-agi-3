@@ -95,7 +95,7 @@ def act(token: str, *, x: int | None = None, y: int | None = None,
     # Record the grounded transition (before, action, after) for simmer's corpus.
     if sess.prev_grid and len(sess.prev_grid) == len(sess.grid):
         store.append_transition(sess.game_id, sess.prev_grid, kind.name, x, y,
-                                sess.grid, sess.score)
+                                sess.grid, sess.score, sess.actions_spent)
     return frame
 
 

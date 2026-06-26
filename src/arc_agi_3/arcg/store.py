@@ -67,8 +67,10 @@ def cache_get(game_id: str, history: list[str]) -> dict | None:
 
 # --- transition corpus (grounded facts) ----------------------------------
 def append_transition(game_id: str, before: list, action: str, x, y,
-                      after: list, score) -> None:
-    rec = {"game_id": game_id, "action": action, "x": x, "y": y,
+                      after: list, score, spent) -> None:
+    # `spent` = piper's budget counter at record time. jotter tallies it to audit
+    # itself against piper: gapless stamps == every action recorded, no drops.
+    rec = {"game_id": game_id, "spent": spent, "action": action, "x": x, "y": y,
            "before": before, "after": after, "score": score}
     TRANSITIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with TRANSITIONS_FILE.open("a") as f:
