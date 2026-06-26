@@ -28,6 +28,28 @@ morphism" and the correctness condition for a decomposition stops being vague ("
 should accomplish the goal") and becomes a single mechanical check — *does the diagram
 commute*.
 
+## The initial DAG: prepopulated with its two boundaries, nothing between
+
+The DAG is born with **exactly its two roots and no middle**:
+
+- **apex:** one childless compound node, **`win game`** — the goal. Childless = undecomposed; its
+  decomposition is grown JIT/abductively (win-down regresses it into subgoals on miss), never
+  authored up front.
+- **base:** one **leaf node per primitive input** the game exposes — its action alphabet
+  (`ACTION1`…`ACTION7`, or whatever the frame's `available_actions` reports). These are the only
+  things the agent can actually *do*; act-up composes from them.
+
+Everything in between — the subgoal decomposition descending from `win game`, the composed
+reachable-state nodes ascending from the primitives — is **emergent**, grown on demand where the
+two roots meet (see §the-two-roots). So the DAG's *boundary conditions* are fixed and its bulk is
+learned.
+
+This is also what makes the [dual-provenance invariant](PLAN.md) (every action points to an
+action node and a hypothesis node) satisfiable from move 0: the **action-node leaves already
+exist** at init for any action to point at, and **`win game`** is the root every subgoal
+eventually hangs under. The first actions are bare primitive leaves testing open hypotheses;
+decomposition fills the middle as the agent learns what achieves the goal.
+
 ## The one invariant: a decomposition is a commuting factorization
 
 A node `g` with children `c1..cn` is a **valid decomposition** iff composing the children
