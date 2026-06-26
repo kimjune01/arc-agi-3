@@ -452,3 +452,32 @@ never reconciled prediction vs reality. Lack of graph-discipline IS what cost th
   neither executes no plan and tests nothing, so it is rejected. Dedup key becomes
   `(state, action, dagger-node, arbor-node)`; the old "prose at the pre-hypothesis frontier"
   exception is dissolved.
+
+## 2026-06-26 — the framing fix VALIDATED (run12) + a concrete gap
+
+Re-ran LS20 under the corrected framing (learn-the-game / action-serves-the-graph / note the
+hypothesis+plan-step per action, reconcile after). Controlled before/after vs run11 (same game,
+old framing):
+- **run11** (goal=score): 50 moves, **0 notes**, no reconciliation, chased a phantom
+  simmer/piper desync, 1/7.
+- **run12** (goal=learn): **15 moves, 9 substantive notes**, every action bracketed by
+  predict→reconcile, **killed+corrected 2 hypotheses** (H2 collect-scores, H3 proximity-scores),
+  **caught the simmer-blind win surprise**, 1/7 as a byproduct. It isolated causality (L1 moves
+  9-14 carried a matching key without scoring; only lock-entry scored) and abstained from
+  re-noting predictable traversal and from grinding L2 (confirmatory → don't act).
+- **Win model cracked** (corrects the earlier "approach-rotation" guess): LS20 = 7-level
+  key-matching locksmith. Toggle-tokens (0/1) edit a carried KEY (bottom-left HUD 3x3, persists
+  across levels); a maze box shows the LOCK target; when key==target, driving the avatar INTO
+  the lock OPENS it (colour-9 lock stops blocking) → +1 + maze regen. The lock-open is the
+  simmer-blind surprise (`step()` correctly predicts blocked; it's the [14] 1465-cell ✗).
+  Documented in engine.py docstring (commit 06920f9, benign, 40 tests pass).
+
+**Concrete gap surfaced:** `arcg notes` is SESSION-BOUND — the graph (now the deliverable)
+**vanished on `arcg end`**; only trace.jsonl preserved the note text. Fix needed: persist the
+hypothesis graph durably (jotter), not in the session. **Open contradiction:** run11 said the
+token rotates the key 90°CW; run12 says it flips a bit — the key-edit mechanic isn't pinned.
+
+Takeaway: June's framing correction (goal = learn, not finish; action serves the graph; dual
+provenance) didn't just make the trace auditable — it made the driver materially better at the
+task (cracked the win model in 15 actions vs a 50-move flounder). Graph-as-goal / win-as-
+byproduct is empirically the right objective.
