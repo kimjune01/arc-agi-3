@@ -59,6 +59,15 @@ free; a real action that resolves no open question is a wasted move.
   tests — the graph (your notes) is the product, the action is the instrument. Finishing the
   game is not the objective and is never a reason to act; understanding it is. An action that
   resolves no open question is wasted even if it happened to raise the score.
+- **Facts come from the record, not from estimates.** A resource/quantity fact — the energy
+  depletion rate, lives left, score deltas, what overlapping a token does to a count — lives in
+  jotter's transitions; never guess it, and never trust simmer's counter for it. Run `jotter
+  effects`: it reports the per-action per-colour count deltas straight from the record, so a
+  non-constant distribution (e.g. `11: -2×N, -4×M`) tells you the rate ISN'T fixed *before* you
+  budget a long leg on it. Division of labour: **simmer** holds the approximate *spatial
+  dynamics* (where things move); **jotter** holds the exact *count facts* (how many of each
+  change). Check the fact against jotter rather than letting an estimate survive until a later
+  run contradicts it.
 - **Determinism.** After RESET the game is a pure function of its action sequence. So
   experiments are cheap and exact: `snapshot`, try, `peek`/`restore`. Never re-query a
   state you have already seen — ask jotter instead. (And re-sync your model from the live frame
@@ -78,7 +87,7 @@ free; a real action that resolves no open question is a wasted move.
 | --- | --- | --- | --- |
 | **piper** (`arcg`) | the REAL game: perceive (`look`/`objects`/`diff`), act (whichever ACTIONs the frame offers — `move`/`interact`/`click`/`undo`), determinism (`snapshot`/`peek`/`restore`), `note`, `start`/`end` | budget | `arcg --help`, [AGENT.md](AGENT.md) |
 | **simmer** | your hand-written model of *this* game. When you learn a mechanic, write it into the engine; `simmer test` replays piper's corpus to check the edit. Predict here, commit in piper, diff the two. The shipped engine models a *movement* game — a different game (click/select/configure) needs a fresh model, or none if you can reason in-head. | free | `simmer --help` |
-| **jotter** | content-addressed memory of every state reached. `jotter has <hash>` (known/novel), `jotter stats`, `jotter audit` (reconciles vs piper's budget). | free | `jotter --help` |
+| **jotter** | content-addressed memory of every state reached + the **grounded-fact oracle**. `jotter effects` (per-action resource/quantity facts from the record — check these, don't estimate), `jotter has <hash>` (known/novel), `jotter stats`, `jotter audit` (reconciles vs piper's budget). | free | `jotter --help` |
 
 simmer's engine is **meant to be hand-edited** — you are the compiler. A bad edit surfaces
 as a failed `simmer test`, localized to the cells it got wrong. Edit freely; the test
