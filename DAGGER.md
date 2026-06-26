@@ -238,28 +238,34 @@ lock" was false at `overlap-lock`'s precondition, that *names* a missing child (
 collect, or a route through a particular token) and `from-kill` inserts it. The win condition
 is `deposit-one-point` repeated ×7 — the same node, seven hits.
 
-## Resource admissibility = A* over a graded graph (the live extension)
+## Resource admissibility = resource-constrained shortest-path DP (the live extension)
 
 run4 broke the typing in the one place it had no slot: a decomposition can commute
 geometrically (every child reachable in simmer) yet be **inexecutable** under a whole-sequence
 resource budget (route length vs energy, with reset-on-depletion and 3 lives). The fix is a
-route-node **admissibility witness**, NOT a numeric planner:
+route-node **admissibility witness** — resource-constrained shortest-path DP, NOT a numeric
+planner and (per codex review) NOT a precomputed "optimal route" cache:
 
-- the resource is a **grade** (energy): the cost monoid `(ℕ∪{∞}, +, 0)`; a route's grade is the
-  sum of its steps; admissible iff `grade ≤ budget`. Grades **compose** (a monoid action), they
-  are not constraints to **solve** — that is what keeps this out of LP / PDDL.
-- compute it as **A\*** over `(cell, energy, lives, carried)`: edges from the witnessed
-  `EnergyClaim` (cost/move, refill cells, reset rule), `h` = lattice distance, and
-  **node identity = jotter's canonical hash** (the reconverging lattice collapses correctly
-  only with the move-counter masked). simmer stays pure geometry; the planner threads the grade;
-  the driver refuses to pay piper for an inadmissible route; an infeasible decomposition is
-  `from-kill`ed as resource-infeasible.
-- this strengthens the invariant from geometric to **executable** entailment:
-  `compose(children) ⊨ parent` now means *reaches the postcondition AND grade ≤ budget*.
+- search the **augmented state** `(position-projection × energy × lives × carried)`, cost =
+  moves, edges from a witnessed `RouteModelClaim` (cost/move, refill cells, reset rule).
+  There is ONE canonical state with NAMED PROJECTIONS — jotter's bar-masked hash is the
+  *position projection* (one coordinate), NOT the state identity; the search key adds the
+  resource coordinates plus model-revision and goal id. simmer stays pure geometry; the planner
+  threads the resources; the driver refuses to pay piper for an inadmissible route; an
+  infeasible decomposition is `from-kill`ed as resource-infeasible.
+- it strengthens the invariant from geometric to **executable** entailment:
+  `compose(children) ⊨ parent` now means *reaches the postcondition AND a route exists within
+  budget under the current model*.
+- routes are **conjectural until stepwise-verified**: before each paid action, predict the next
+  step and compare to reality; on mismatch, kill the edge, invalidate dependents, replan. Only
+  routes executed to goal are promoted to trusted dagger fragments. Minimum version is **lazy
+  caching of executed successful suffixes**, not a full value table.
 
-The full framing — graded(-Elgot) monad, the bounded-loop/Layer-2 vs unbounded/Layer-3 =
-deduction/induction line, graded Hoare as the typing home — is in [GRADES.md](GRADES.md). The
-`unmodellable` cost-class above is exactly Layer 3 (`m* = ∞`): witness it, don't deduce it.
+The sound residue of the certificate idea: a finite cost-certificate ≤ budget separates
+deduce-for-free from must-refine-or-witness. `unmodellable` (above) = *no finite certificate
+under the current abstraction*, escapable three ways — refine the abstraction, find a ranking,
+or witness. (An earlier graded(-Elgot)-monad framing that tried to make `m* = ∞` itself *mean*
+"must witness" was debunked in review and removed; see WORKLOG.)
 
 ## Deferred until it goes off the rails
 

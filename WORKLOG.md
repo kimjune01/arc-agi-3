@@ -308,3 +308,38 @@ implementation subsection (A* admissibility witness) + a pointer.
 - Typing home = graded Hoare (`reading/.../hoare-graded`); lattice-collapse soundness = Markov
   / path-independence (Fritz-Perrone). lattice + graded + content-addressed dedup = one object:
   a cost-graded deterministic (Markov) reachability monad. Nothing built yet — theory pinned.
+
+## 2026-06-25 — graded theory DEBUNKED and removed; "it's DP"
+
+Two codex reviews (what-to-do, then design-review) plus June's own deflation ("is it DP?")
+collapsed the graded(-Elgot) theory:
+- The central identification `m* = ∞ ⟺ must-witness` is **unsound** — metaphor, not math.
+  `m* = ∞` is a conservative static upper bound under a grade-only abstraction, NOT epistemic
+  unknowability. Counterexample: `countdown(n)` is bounded yet grade-unbounded → deducible as
+  `n·m` with a ranking function, no witnessing. The free/paid line is *finite certificate vs
+  no certificate under the current abstraction*, with three escapes (refine / rank / witness),
+  not finite-vs-infinite behaviour.
+- The engine was always just **DP**: resource-constrained shortest-path over augmented state,
+  grade = the DP value (tropical (min,+) semiring), reconverging lattice = overlapping
+  subproblems. The CT earned exactly two things and nothing more: it ruled out LP, and it
+  located the certificate/termination question codex then made precise.
+- Design review also killed two committed errors: "node identity = jotter's canonical hash"
+  (it's ONE coordinate, not the state — one canonical state with NAMED projections) and
+  putting `V/π` in jotter (category error — that's procedural/dagger, not episodic). And
+  `EnergyClaim` → `RouteModelClaim` (model wrongness is broader than energy). Memoization
+  recast as lazy caching of *executed* successful suffixes with stepwise prefix-verification,
+  conjectural-until-verified; no full value table, no "optimal" claim over an unproven-Markov
+  abstraction.
+
+Action: **removed GRADES.md** (the debunked theory note); rewrote DAGGER.md's resource section
+to the sound DP version (no graded apparatus, no GRADES.md pointer). Kept only the deflated
+takeaway: it's DP; admissibility = resource-constrained shortest-path; certificate = finite
+cost bound ≤ budget.
+
+Next direction under discussion (not built): the hypothesis generator as **scale-free,
+boundary-conditioned relational pattern inference** over jotter's past operations (object-local
+patterns, translation/scale/grid-size invariant → game-agnostic; mechanic patterns are local &
+scale-free = deducible, non-local effects = goal/terminal = must-witness). June frames the
+heuristic vocabulary via **Pólya** (working-backwards = win-down, "related problem"/analogy =
+the scale-free retrieval, decomposition = dagger, look-back = write-back, specialization =
+simmer-test, generalization = the scale-free rule). To be reviewed before any build.
