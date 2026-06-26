@@ -540,3 +540,23 @@ showed it visibly breaks (ignored), and run12/run13 showed it works *when follow
 goodwill — so codify the gate. Each gate is poka-yoke (fires pre-API, zero budget, names the
 rule in the error so any driver learns it by hitting it). The prompt stays as onboarding; the
 GATE is what makes it robust. Not built yet — recorded as the direction; the trigger has fired.
+
+## 2026-06-26 — hypothesis generation: generous diverse branching is the creative act
+
+June: hypothesis generation should be GENEROUS with branching for DIVERSITY — that's the
+creative act. Design principle for arbor's `abduce` and dagger's win-down:
+- **Be lavish at generation because it's FREE.** Branching = abduction = the uberty pole, which
+  runs in-head/simmer at zero budget; the bench gives infinite thinking. The whole economy is on
+  the VERIFICATION side (paid actions/tests). Stinginess at generation is a category error.
+- **Diversity, not volume — and it's information-optimal.** Diverse hypotheses make DIFFERENT
+  predictions, so each paid test discriminates many at once; clustered variations predict the
+  same delta and waste tests. A diverse hypothesis set IS the optimal experiment design
+  (maximizes information per test — the e-value/discrimination view). The creative act at
+  generation is what makes the ruthless step at verification cheap.
+- **The asymmetry is the engine:** generous + diverse at generation (uberty, free); ruthless +
+  convergent at verification (security, paid — one counterexample kills, the differential test,
+  the oracle). Diversify, then filter. The wide diverse frontier also dodges the local-optimum
+  trap perturbation hill-climbing falls into — diversity IS the global search.
+- **Lands in:** `abduce` returns a DIVERSE FRONTIER, not a single claim; win-down branches into
+  diverse candidate decompositions. Pairs with from-kill: from-kill gives DEPTH (the
+  counterexample-covering successor), generous branching gives BREADTH around it.
