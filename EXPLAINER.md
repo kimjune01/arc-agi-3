@@ -26,25 +26,44 @@ and jotter's graph are one shared run.
 
 ## The goal
 
-You are playing an unknown 64×64 grid puzzle. The rules are not given. **Learn them by
-acting and watching the delta.** Drive `score` to the win target in the fewest actions —
-scoring is efficiency, so every real action counts.
+**The goal is to learn how the game works — not to finish it.** You are reverse-engineering an
+unknown 64×64 grid puzzle: building a graph of hypotheses about its mechanics, its objective,
+and how to reach it. **Score is a byproduct** — it confirms your model is correct; it is never
+the thing you pursue. You don't move to get closer to the win; you move to resolve the most
+valuable open question about how the game behaves. The deliverable is the validated hypothesis
+graph (your `note`s); a clean, correct model with the win falling out of it is the shape of
+success. An action "counts" not because actions are scarce on the road to a win, but because an
+action that doesn't expand or test the graph is wasted.
 
 ## The loop (one actor: you)
 
 ```
-perceive → predict in-head → act (or experiment for free) → reconcile → note → plan → repeat
+perceive → form a hypothesis → predict → act (only to test it) → reconcile → note → repeat
 ```
 
-You are the only actor. The modules are your instrument panel; you do the attending and
-deciding. Predict in simmer or in your head, commit the irreducible step in piper, and
-reconcile the two by diffing.
+You are the only actor, and **every action is a means to expand the hypothesis graph, never an
+end.** Every action names two things: the **hypothesis** it tests (why) and the **plan-step** it
+executes (what) — `note` both before acting, with your prediction. (These are the prose form of
+the dual provenance every action carries: a hypothesis-node ref and an action-node ref. An
+action that names neither tests nothing and executes no plan — don't take it.) After, reconcile
+prediction against reality and `note` the verdict: *witnessed*
+(your model held) or *killed* (your model was wrong — record the correction). The **surprise**,
+where reality breaks your prediction, is the most valuable thing on the board; chase it. And the
+corollary: **if you already know what an action would do** — an existing witnessed hypothesis
+entails it, or simmer predicts it for free — **don't take it.** Reasoning and simulation are
+free; a real action that resolves no open question is a wasted move.
 
 ## Principles
 
+- **Action serves the graph.** A piper action is justified only by the hypothesis it expands or
+  tests — the graph (your notes) is the product, the action is the instrument. Finishing the
+  game is not the objective and is never a reason to act; understanding it is. An action that
+  resolves no open question is wasted even if it happened to raise the score.
 - **Determinism.** After RESET the game is a pure function of its action sequence. So
   experiments are cheap and exact: `snapshot`, try, `peek`/`restore`. Never re-query a
-  state you have already seen — ask jotter instead.
+  state you have already seen — ask jotter instead. (And re-sync your model from the live frame
+  after anything that could move you unexpectedly — a large/anomalous delta means your predicted
+  position may be a phantom.)
 - **Budget.** piper actions are the only spend; reasoning and simmer are free. Spend a
   real action only when a free rollout is untrustworthy. The sharpest case is a move that
   is both *novel* (jotter has never reached the result) and *surprising* (simmer can't

@@ -420,3 +420,35 @@ structurally new game — **navigation** (tn36 is click/program, not move), **co
 no live poll). The skeleton (perceive→hypothesize→act→reconcile→note) held throughout; the
 instance machinery and the observation model did not. tn36 banked as: blocked behind #54 +
 the apparently API-inert run button (#89); not programmatically winnable as-is.
+
+## 2026-06-26 — LS20 drive (1/7) → the framing fix: learn the game, don't finish it
+
+Ran an LS20 "clear levels" drive (run11). Result 1/7, level 1 cleared but ~50 actions wasted.
+The failure mode taught the lesson:
+- **Findings.** (a) **Deposit rule corrected** (supersedes the "approach-rotation operator"
+  build-next from the resource/grade era): the carried HUD pattern must EXACTLY equal the lock
+  pattern, then slide the avatar in — the lock's 9s become passable only on an exact match; each
+  token pass rotates the carried pattern 90° CW (a 4-cycle), so collect until it matches. No
+  approach-direction rotation. (b) **simmer desyncs from piper on an energy reset:** the bar
+  empties (~42 moves) → avatar teleports to level-start + loses a life, but the slide model kept
+  predicting from the phantom pre-reset position, so BFS routes and 4 deposit-tests all ran
+  against an avatar that wasn't there. Guard: re-sync from the live grid after an anomalous delta
+  (>100 cells) or every ~35 moves; the reset is invisible to the slide model.
+
+**The framing correction (June, two passes):** "take action only as a means to expand the
+hypothesis graph"; "the goal isn't to finish the game, it's to learn how it works." My drive
+prompt had it backwards — goal=score, actions as ends — so the driver just moved (50 moves, 0
+notes, no reasoning on any action; `arcg notes` empty) and never noticed the desync because it
+never reconciled prediction vs reality. Lack of graph-discipline IS what cost the run.
+- **EXPLAINER.md reframed:** the goal is to learn how the game works; score is a byproduct that
+  confirms the model. Every action is a means to expand the hypothesis graph, never an end; if
+  you already know the outcome (witnessed hypothesis entails it, or simmer predicts it), don't
+  act. Added principle "Action serves the graph"; loop is now predict→act-to-test→reconcile→note.
+- **PLAN.md jotter invariant tightened (June):** "all actions in jotter must point to an action
+  node and a hypothesis node." Action-provenance is now a MANDATORY DUAL ref — `dagger:<id>`
+  (the action node executed) AND `arbor:#<id>` (the hypothesis tested) — on every action, no
+  exceptions (even a probe names an open hypothesis + a probe node). This is epmem linking
+  pmem↔smem, and the structural enforcement of "action serves the graph": an action naming
+  neither executes no plan and tests nothing, so it is rejected. Dedup key becomes
+  `(state, action, dagger-node, arbor-node)`; the old "prose at the pre-hypothesis frontier"
+  exception is dissolved.
