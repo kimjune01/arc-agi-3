@@ -245,19 +245,22 @@ as a balance — it's a directed flow (uberty → security) the architecture alr
 (a kill-edge IS a uberty-injection), so the trajectory is a sawtooth, not a slide — global
 uberty early, localized uberty pockets at the surprising frontier late. The system is
 always maximally fertile where ignorant, maximally secure where verified; the boundary
-moves itself, no global knob. (2) **Budget is the regulator**: uberty is free (simmer),
-security is dear (piper), so the cost gradient front-loads uberty and back-loads security
-(Peirce's economy of research, falling out of RHAE). (3) **The poles sit at different
+moves itself, no global knob. (2) **Budget regulates the conversion, not the poles** — cost
+is orthogonal to the uberty/security axis. Abduction (the uberty pole) and deduction (simmer)
+are BOTH free; the one metered mode is **induction** — piper's witness against reality. So
+RHAE prices neither uberty nor security as such, but the inductive grounding that converts a
+high-uberty guess into something secure (Peirce's economy of research). (3) **The poles sit at different
 depths**: uberty at the frontier (open nodes, win-down guesses), security at the core
 (witnessed nodes, act-up reachable set); the two roots MEETING is the conversion (a
 win-down guess cashed into an act-up verified path). dagger's JIT-on-miss is the
-allocator: a hit spends security (free), a miss spends uberty (abduce → verify → bank), a
-failed decomposition re-injects uberty locally (re-abduce the missing child). write-once +
+allocator: a hit is a free deductive replay of a secured node, a miss abduces for free then
+pays one inductive verify (abduce → verify → bank), a failed decomposition re-injects uberty
+locally (re-abduce the missing child). write-once +
 from-kill make security accrue NON-destructively, so gaining it never strangles uberty
 (the option to re-abduce stays open) — the guard against premature convergence. Residual
 (same fault line): auto-scheduled for the dense-feedback layer (mechanics,
-plans-over-simmer); carried by hand via the LLM prior for GOALS (sparse score → uberty
-cheap to spawn, expensive to secure).
+plans-over-simmer); carried by hand via the LLM prior for GOALS (sparse score → a goal-guess
+is cheap to spawn by abduction, expensive to ground by induction).
 
 ### cold start: goal-guess first (free), first mechanic second (paid)
 A staggered bootstrap, not symmetric simultaneity — the asymmetry is forced by what each

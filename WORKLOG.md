@@ -224,3 +224,21 @@ Extended DAGGER.md's soft typing with how uncertainty is handled (all prose, no 
   Surprise-driven climb beats perturbation hill-climb: ∞-size steps where deterministic, and
   counterexample-generated (not perturbation-generated) challengers escape local optima.
   Banked for arbor (witness/credence ledger) when prose status can't discriminate; not built.
+
+## 2026-06-25 — terminology fix: uberty ⊥ cost (per reading/methodeutics ch2)
+
+Caught a conflation (mine, in conversation; one spot in PLAN.md): I'd been using **uberty**
+to mean "free/cheap/unbounded," collapsing the cost axis into the uberty/security axis. Per
+Peirce (1913) / methodeutics ch2: **uberty = how much a conclusion exceeds its premises**
+(information gain); **security = whether it can be false given true premises**. Both are
+properties of the inference *mode*, independent of compute cost. Corrected mapping:
+- abduction = max uberty / min security — propose a mechanic or decomposition — **free**.
+- deduction = zero uberty / max security — simmer rollouts (apply the learned step) — **free**.
+- induction = moderate both — **piper**: witness prediction vs reality, grow the corpus — **paid**.
+Cost is a separate column: abduction AND deduction are both free (imagination); only induction
+is metered. So "uberty is free (simmer)" was wrong twice — simmer is *deduction* (not the
+uberty source), and freeness isn't what makes a mode uberty. Fixed PLAN.md §uberty-vs-security
+(budget regulates the inductive conversion, not the poles). DAGGER.md was already clean (uberty
+= node status; cost = the trial's separate free/paid class). Bench upshot, restated correctly:
+ARC-AGI-3 meters *induction* and leaves abduction+deduction free — sample-efficiency is
+inductive-efficiency (fewest witnesses to ground a model free deduction can then run on).
