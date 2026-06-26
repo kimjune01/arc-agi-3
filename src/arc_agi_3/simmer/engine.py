@@ -21,6 +21,17 @@ Hypotheses encoded so far (LS20, refined against the corpus 2026-06-25):
 - Every move action depletes the energy bar (colour 11) by one column, from the left,
   whether or not the avatar actually moved (it still costs energy). Localized by the
   2-cell residual the slide rule left behind.
+- WIN TRIGGER (run12, instance 9607627b, witnessed): LS20 is a 7-level key-matching
+  locksmith. The bottom-left HUD box (rows ~53-62, cols ~1-10) holds a 3x3 carried KEY
+  glyph (colour 9, 2x2 blocks); it PERSISTS across levels. A maze 5-box holds the LOCK
+  target 3x3 (colour-9 glyph). Toggle-tokens (colour 0/1) flip a key bit when the avatar
+  overlaps them. When key==target, driving the avatar INTO the lock OPENS it: the colour-9
+  lock cells stop blocking (they ARE walls otherwise, hence kept out of PASSABLE), the
+  avatar advances, score +1, and the maze regenerates with the bar refilled. This
+  lock-state effect is DELIBERATELY UNMODELLED here (it depends on the HUD/lock glyph
+  match, not reachable from the grid via a pure local rule the planner needs): step()
+  correctly predicts the lock as blocked, which is the safe default for routing. The
+  planner's job is to reach the lock; the open is then a single real action.
 """
 
 from __future__ import annotations
