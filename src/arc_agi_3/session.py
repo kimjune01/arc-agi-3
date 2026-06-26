@@ -12,10 +12,13 @@ JSON file under `.arc/`:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-STATE_DIR = Path(".arc")
+# State dir is overridable so each run can get a fresh, throwaway location (e.g.
+# `ARCG_STATE_DIR=/tmp/arcg-ls20-1`) instead of polluting the cwd with `.arc`.
+STATE_DIR = Path(os.environ.get("ARCG_STATE_DIR", ".arc"))
 STATE_FILE = STATE_DIR / "session.json"
 
 

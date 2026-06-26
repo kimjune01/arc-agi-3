@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 arc3 = "arc_agi_3.main:main"
 arcg = "arc_agi_3.arcg.cli:main"
+simmer = "arc_agi_3.simmer.cli:main"
 
 [dependency-groups]
 dev = [

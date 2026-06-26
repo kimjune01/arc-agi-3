@@ -15,6 +15,10 @@ from ..session import STATE_DIR, Session
 
 CACHE_FILE = STATE_DIR / "cache.json"
 SNAP_DIR = STATE_DIR / "snapshots"
+# Append-only grounded-facts corpus: one (before, action, after) transition per
+# state-changing action. The proto-jotter grounded-facts track, and the test
+# corpus `simmer test` differentially checks its engine against.
+TRANSITIONS_FILE = STATE_DIR / "transitions.jsonl"
 
 
 # --- session -------------------------------------------------------------
@@ -59,6 +63,16 @@ def cache_put(game_id: str, history: list[str], frame: dict) -> None:
 
 def cache_get(game_id: str, history: list[str]) -> dict | None:
     return _load_cache().get(_seq_key(game_id, history))
+
+
+# --- transition corpus (grounded facts) ----------------------------------
+def append_transition(game_id: str, before: list, action: str, x, y,
+                      after: list, score) -> None:
+    rec = {"game_id": game_id, "action": action, "x": x, "y": y,
+           "before": before, "after": after, "score": score}
+    TRANSITIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with TRANSITIONS_FILE.open("a") as f:
+        f.write(json.dumps(rec) + "\n")
 
 
 # --- named snapshots -----------------------------------------------------

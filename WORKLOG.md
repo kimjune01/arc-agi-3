@@ -1098,3 +1098,37 @@ determinism-backed snapshot/restore) with nothing to codify. Validates build-as-
 jotter/arbor/simmer/dagger stay deferred. Watch-for-break signals noted but not yet hit:
 grid is ~4KB/look (context pressure → jotter when trajectory outgrows context); prose-noted
 mechanics worked for 1 (arbor when claims multiply). No code changed this turn.
+
+### simmer BUILT — hand-edited functional engine, differential-tested vs corpus (4/4)
+Wired up simmer: the model where you edit the engine code directly and gate it against
+piper's recorded transitions. Closed the loop on real LS20 data in one sitting.
+
+Infra first:
+- **State dir is now env-overridable** (`ARCG_STATE_DIR`, default `.arc`) so each run gets a
+  fresh throwaway dir (`/tmp/arcg-ls20-sim`) instead of polluting cwd (the drive had dumped
+  `.arc` into the blog repo). Answers June's "each run gets a fresh dir" — now yes.
+- **piper records the transition corpus**: `store.append_transition` writes one
+  `{game_id, action, x, y, before, after, score}` per state-changing action to
+  `transitions.jsonl` (the proto-jotter grounded-facts track; the test corpus).
+
+simmer module (`src/arc_agi_3/simmer/`, console script `simmer`):
+- `engine.py` — PURE `step(grid, action) -> grid'`, hand-edited. EDIT-THIS-FILE is the
+  interface. Seeded with the LS20 avatar+tail slide.
+- `cli.py` — `simmer test` replays the corpus through step and reports reproduced / WHERE it
+  diverges (reuses `diff_grids`); `simmer step <i>` shows one prediction vs reality.
+- 4 unit tests (engine slide/block/identity + harness counting); 33 total pass.
+
+The loop, live (this is the whole point):
+1. Hand-wrote "slide avatar+9-tail by 5". `simmer test` → **0/4**, but the misses were
+   LOCALIZED: up/down moves off by exactly 2 cells (the un-modeled energy bar), the left move
+   off by 52 (slid into a wall the engine ignored).
+2. The corpus REFUTED "always 5": the left move was wall-blocked — two observations alone
+   couldn't show this, the differential test did (the fixed-5-vs-slide-to-wall question,
+   answered).
+3. Edited engine.py directly: slide only into clear corridor (else blocked), deplete one bar
+   column per move. `simmer test` → **4/4 reproduced**.
+
+This is the abductor/uberty→security loop concretely: a free hypothesis (uberty) cashed into a
+verified engine (security) by differential test against the grounded corpus, the gap localized
+so the refinement is surgical. arbor→simmer compilation still deferred (engine is hand-written
+prose-first); when claims multiply, compile instead of hand-edit.
