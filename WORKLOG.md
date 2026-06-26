@@ -52,3 +52,33 @@ set `ARCG_STATE_DIR=/tmp/arcg-<run>` per run. Do NOT `cd` into the repo (autoenv
 the shell) — use `git -C` and `--project`/absolute paths.
 
 ---
+
+## 2026-06-25 — explainer prompt + fresh-instance drive (closes M0 step 2)
+
+Wrote the two missing M0 pieces and validated them on a fresh LS20.
+
+- **`bin/claim-run.sh [N]`** — optional run-number param → claims `/tmp/arcg-run<N>`.
+  Given N: idempotent (re-claim resumes the same dir). Omitted: picks next free number
+  so a new run never collides. Prints only the dir on stdout (captureable as `RUN=$(...)`);
+  narration on stderr; validates the arg. All three modules share `ARCG_STATE_DIR=$RUN`.
+- **`EXPLAINER.md`** — the session opener (M0 step 2). The MAP not the manual: run-dir
+  claim, goal, the serial loop, tool→role (piper/simmer/jotter), the three principles
+  (determinism/budget/figure-ground), the cold-start start sequence. Defers every *how*
+  to `--help` + AGENT.md. This is what makes the demo run from a FRESH session, not just
+  the one that built it — the gap that left M0 unclosed.
+
+**Drive (run1, fresh LS20 instance, budget 3/40).** Cold-start sequence ran as written:
+`look`+`objects` → goal-guess note → goal-biased probe. Findings:
+- ACTION1 = up: slides the 12-avatar + 9-tail unit by 5, wall-blocked. ACTION3 here =
+  blocked (avatar pinned by wall, only the bar moved).
+- 11-bar = an **on-board move counter**: 1 column (2 cells) depletes per action, ~42 total.
+- **The mechanic model TRANSFERRED to a fresh instance with zero divergence**: simmer
+  reproduced 3/3 (incl. the new action and the blocked move); jotter `audit` MATCH ✓
+  (gapless stamps, count == piper actions_spent).
+
+**Ratchet read.** Nothing in-head broke. piper/simmer/jotter are solid on a fresh board;
+the perception/mechanic/memory stack generalizes. The unsolved frontier is the **GOAL
+side** — score stayed 0/7, straight navigation doesn't score, win condition unknown. So
+the next module-break will come from win-down/goal decomposition (dagger / arbor's
+goal-claims), not from perception or mechanics. Confirmed by driving, not guessed: arbor
+and dagger stay ratchet-deferred until a real run-to-score taxes the in-head goal model.
