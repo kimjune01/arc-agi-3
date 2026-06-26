@@ -560,3 +560,41 @@ creative act. Design principle for arbor's `abduce` and dagger's win-down:
 - **Lands in:** `abduce` returns a DIVERSE FRONTIER, not a single claim; win-down branches into
   diverse candidate decompositions. Pairs with from-kill: from-kill gives DEPTH (the
   counterexample-covering successor), generous branching gives BREADTH around it.
+
+## 2026-06-26 — dagger induction mechanism: HTN-Maker + DreamCoder, read in full
+
+Fetched CURRICULAMA/HTN-Maker (arXiv 2404.06325) and DreamCoder (2006.08381) for the
+decomposition-INDUCTION mechanism dagger had sketched least. They map one-to-each onto the two
+roots and fix each other's failure:
+- **Win-down = goal regression (HTN-Maker).** Regress the goal backward through a SCORING
+  trace's action suffix → the regressed precondition is the method's domain, the goal its
+  codomain. This is the concrete mechanism to COMPUTE a dagger node's pre/post (the
+  commuting-factorization typing) from a real winning trace — we had the typing, not the
+  mining.
+- **Act-up = compression (DreamCoder).** Promote action-subsequences that repeat ACROSS traces
+  to reusable sub-DAGs. (Skip DreamCoder's version-space λ-refactoring — our "programs" are flat
+  action sequences; finding repeats is cheap. Take the idea, not the machinery.)
+- **THE KEY TRANSFER — MDL keep-criterion fixes the bloat.** CURRICULAMA's one unsolved failure:
+  learned-method count grows WITHOUT BOUND (utility problem; they keep every candidate).
+  DreamCoder's cure: keep an abstraction iff it REDUCES total description length
+  (`−logP[L] + Σ prog-len`). So: mine by regression, KEEP by MDL-compression. This is the
+  "compress" half of compress-and-unfold made quantitative ("keep iff it shortens the corpus's
+  encoding"), and it's the anti-bloat guard HTN-Maker lacks.
+- **Annotated-task burden dissolves via landmarks — ours are free.** CURRICULAMA mines landmarks
+  (facts that must hold en route) → subgoals → easy-to-hard curriculum (expand the plan window
+  backward). dagger's landmarks come free from the score sub-conditions (X/N = N subgoals) + the
+  witnessed intermediate states jotter already records along a winning trace ("key==target"
+  before "lock opens"). Subgoals mined from jotter, not annotated.
+- **Dream with simmer.** DreamCoder trains its search-guide on FANTASIES (library samples solved
+  in imagination) because real tasks are few. simmer is our fantasy engine: roll out
+  hypothetical decompositions FREE to validate/stress the cache without spending a real action.
+- **Already have (confirmed):** commuting-factorization check = their execution-validation;
+  from-kill = collapse-on-rot; JIT-on-miss = wake-phase search. The papers confirm our
+  validation is the right kind, don't ask us to add one.
+- **Don't copy:** HTN-Maker hand-annotation (use landmarks); "keep all mined methods" (use MDL);
+  DreamCoder's version-space machinery + year-of-CPU (overkill for flat action seqs).
+
+Net: dagger = goal-regression (win-down) + repeat-compression (act-up), candidates mined from
+scoring traces in jotter, KEPT by an MDL criterion, validated by the commuting check, dreamed in
+simmer. The MDL keep-criterion is the load-bearing import — it's what makes the decomposition
+cache converge instead of bloat.
