@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from arc_agi_3.jotter.graph import EpMem, state_hash
+from arc_agi_3.jotter.graph import EpMem, detect_counter, state_hash
 
 
 def _g(seed):
@@ -27,28 +27,31 @@ def test_dedup_and_transposition():
     assert state_hash(C) in m.transpositions()  # reached >1 way
 
 
-def _bar_grid(bar_cols, pickup=True):
-    """8x8: avatar top-left, an optional maze pickup (small 11, high up), a bottom bar."""
-    g = np.full((8, 8), 3, np.int16)   # corridor
-    g[0, 0] = 12                        # avatar
-    if pickup:
-        g[3, 3] = 11; g[3, 4] = 11     # energy pickup (kept)
-    for c in bar_cols:
-        g[7, c] = 11                   # bottom energy bar (masked)
+def _counter_grid(strip_len, colour=9, marker=False):
+    """8x8: a thin bottom strip (the move-counter) of `strip_len` cells, + optional salient cell.
+    No hardcoded colour/position — detection keys on the depletion behaviour across a sequence."""
+    g = np.full((8, 8), 3, np.int16)
+    g[7, :strip_len] = colour          # the counter strip, ticking down one cell per action
+    if marker:
+        g[3, 3] = 1                    # a salient game cell (e.g. a placed marker)
     return g.tolist()
 
 
-def test_canonical_hash_ignores_bar_depletion():
-    # same place, different move-counter (bar depleted two columns -> they read as corridor)
-    full = _bar_grid([1, 2, 3, 4, 5])
-    depleted = _bar_grid([3, 4, 5])
-    assert state_hash(full) == state_hash(depleted)
+def test_detect_counter_masks_depletion():
+    # a run where the bottom strip depletes one cell per action — detect it from the sequence
+    seq = [_counter_grid(5), _counter_grid(4), _counter_grid(3), _counter_grid(2)]
+    counter = detect_counter(seq)
+    assert counter                                  # found the counter strip
+    # two states differing ONLY in counter length hash identically once it's masked
+    assert state_hash(_counter_grid(5), counter) == state_hash(_counter_grid(2), counter)
 
 
-def test_canonical_hash_keeps_pickup():
-    # collecting a maze pickup IS salient — must change the hash
-    assert state_hash(_bar_grid([1, 2, 3, 4, 5], pickup=True)) \
-        != state_hash(_bar_grid([1, 2, 3, 4, 5], pickup=False))
+def test_detect_counter_keeps_salient_change():
+    seq = [_counter_grid(5), _counter_grid(4), _counter_grid(3), _counter_grid(2)]
+    counter = detect_counter(seq)
+    # a real game change (placing a marker, off the counter strip) is NOT masked
+    assert state_hash(_counter_grid(3, marker=False), counter) \
+        != state_hash(_counter_grid(3, marker=True), counter)
 
 
 def test_revisit_detection():

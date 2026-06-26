@@ -356,3 +356,34 @@ alignment/nearest-in-direction), with support/counterexample/confidence.
   schema mining + uncertainty-gated piper escalation. Trigger to mechanize: LLM repeats
   trace-inspection across games / a transition recurs 3–5× with role variation / bad guesses
   waste piper / need confidence accounting the LLM can't hold. Until then in-head is fine.
+
+## 2026-06-25 — tn36 generality probe: skeleton general; LS20 leaked into docs AND code
+
+Drove tn36 cold (a click-only configure/visual-programming puzzle: no avatar, no movement, no
+path — score 0/7, mapped the surface in 11 clicks) as a generality test of the navigation-built
+skeleton. Verdict:
+- **The general loop survived** (perceive→hypothesize→act→reconcile→note worked on a radically
+  different game). The skeleton is game-agnostic; the strain was entirely in the LS20 vocabulary
+  wrapped around it.
+- **LS20 leaked into the DOCS** — 6 tells the cold driver flagged: move verbs, "delta localizes
+  your avatar", "energy bar", "no change = wall", route/path framing, simmer modeling the wrong
+  mechanic.
+- **LS20 leaked into the CODE** — jotter's canonical-hash masked a hardcoded bottommost colour-11
+  component (pure LS20). tn36's counter is colour-9 on TOP → unmasked → the bar-defeats-dedup bug
+  returned: 6 of 12 states were hidden revisits, one config reached 5x. The driver's own "0
+  revisits, never re-reached a state" was reading a metric that was wrong on this game.
+
+Fixes (both licensed by witnessed breakage):
+- **De-LS20-ified EXPLAINER.md + AGENT.md**: delta→effect-of-action (not avatar); no-change→inert
+  region (not wall); energy-bar→generic step-meter (thin depleting strip, any colour/edge); added
+  an interaction-discovery start (probe each region control-vs-inert before guessing the goal) and
+  a win-model branch point (path / config-match / selection / sequence); simmer's mechanic marked
+  an explicit per-game assumption; available-actions set the game type, don't assume navigation.
+- **Generalized jotter's counter detection** (graph.py): replaced the hardcoded colour-11-bottom
+  mask with `detect_counter(states)` — the move-counter is the thin band touched by ~every
+  transition (it ticks unconditionally each action; game mechanics fire only when acted on); mask
+  the bbox of its ever-diffed cells. Game-agnostic (keys on behaviour, not colour/position),
+  detected from the corpus on load. Verified: run5/tn36 0→3 revisits + 0→3 transpositions (12→6
+  unique); run4/run2 LS20 unchanged (18 revisits/2 transpositions, 16 unique); 40 tests pass.
+  The move-counter is now a generic factored element (witnessed across 3 games) — the first
+  concrete piece of the factored-observer model June proposed.
