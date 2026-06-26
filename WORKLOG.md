@@ -481,3 +481,30 @@ Takeaway: June's framing correction (goal = learn, not finish; action serves the
 provenance) didn't just make the trace auditable — it made the driver materially better at the
 task (cracked the win model in 15 actions vs a 50-move flounder). Graph-as-goal / win-as-
 byproduct is empirically the right objective.
+
+## 2026-06-26 — run13: Q1 contradiction settled (ROTATE); simmer energy-rate gap
+
+Graph-disciplined LS20 drive seeded with run12's validated win model, tasked to resolve the
+open questions. 14 notes, 38/80 budget, 1/7 (byproduct), no engine edits.
+- **Q1 RESOLVED — the toggle-token ROTATES the carried key 90° CW** (whole 3×3), witnessed
+  twice with a discriminating test: predicted rotate vs toggle vs set, reconciled — toggle
+  killed (two cells change, not one), set killed (lvl2 result ≠ lvl1's, so not a fixed value).
+  **Settles the run11-vs-run12 contradiction: run11 (rotate) was right; run12 ("flip a bit")
+  was wrong.**
+- **New mechanics** (each predict→reconcile): token REGENERATES on avatar-leave (oscillate for
+  multiple rotations); a within-level DEATH-reset reverts the carried key to its level-entry
+  value (survives wins, not deaths); colour-8 = lives; pickups (11) refill the bar to full.
+- **Q2 (direction-agnostic trigger) NOT witnessed — budget-blocked.** Lvl2's lock affords a
+  DOWN entry (geometry characterized); the win-model predicts it opens regardless of direction,
+  unconfirmed.
+- **Concrete gap: simmer under-models energy.** The bar depletes ~2 cols/move; `_deplete_bar`
+  removes 1 → the agent under-budgeted, ran the bar to 0 mid-route, ate a reset (wiped its
+  rotations, cost Q2). Routing (avatar position) unaffected, but energy-budgeting is — and
+  energy now gates route feasibility. `simmer test` 10/38 (the bar mismatch misses ~every move).
+- Notes-persistence gap (run12) still stands: recovered the graph from trace again; `arcg notes`
+  died with the session.
+
+The framing keeps delivering: resolved a standing contradiction with a real test, banked four
+mechanics, caught the run11-killer (energy reset) as a surprise instead of grinding through it,
+stopped economically. Remaining friction is tooling (energy fidelity, note persistence), not the
+driver's reasoning.
