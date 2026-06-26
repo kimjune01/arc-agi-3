@@ -508,3 +508,35 @@ The framing keeps delivering: resolved a standing contradiction with a real test
 mechanics, caught the run11-killer (energy reset) as a surprise instead of grinding through it,
 stopped economically. Remaining friction is tooling (energy fidelity, note persistence), not the
 driver's reasoning.
+
+## 2026-06-26 — intent: move discipline from prompt-suggestion to harness-enforced gate
+
+Realism check (June): **prompts are suggestions.** The EXPLAINER/AGENT framing is guidance to
+an LLM driver, not a guarantee — it can be ignored (run11 ignored "note what you learn": 50
+moves, 0 notes). So prompt-level discipline isn't robust; it rides on the driver's goodwill.
+Robustness comes from the **harness ENFORCING** the invariants — the project's own division
+("modules = harness: hold + gate, mechanical; driver = reasoner: attend + decide") and the
+poka-yoke boundary ("guard invariants, pre-API; a free bounce, not a backstep").
+
+INTENT — migrate the disciplines we've been writing as prompt text into harness-enforced GATES,
+so they hold regardless of driver (LLM or coded policy). All of these guard **process
+invariants** (properties of the reasoning loop), NOT game hypotheses — so they respect "guard
+invariants, never hypotheses": the harness enforces *how you reason*, never *what the game's
+rules are*.
+- **Dual-provenance gate** (PLAN.md: every action → an action-node + a hypothesis-node): make it
+  an actual GATE — the act/commit path REJECTS an action lacking both refs, with a typed
+  instructive error. A blind action becomes structurally impossible. (Today: the prompt merely
+  asks the driver to `note` both.)
+- **Hypothesis-before-act gate**: the act path requires a recorded hypothesis + prediction
+  first; a bare move that names no open question is refused pre-API.
+- **Reconcile automatically**: the harness computes prediction-vs-reality (the surprise) on
+  every act — the kill/witness is mechanical, not an optional habit.
+- **Facts → jotter, automatically**: the planner/harness auto-consults `jotter effects` for
+  resource/quantity facts rather than relying on the driver to remember to ask — a fact-check
+  the harness performs, not a discipline the prompt requests.
+
+This is the ratchet applied to the DISCIPLINE itself: the prompt is the in-head version; run11
+showed it visibly breaks (ignored), and run12/run13 showed it works *when followed* but only on
+goodwill — so codify the gate. Each gate is poka-yoke (fires pre-API, zero budget, names the
+rule in the error so any driver learns it by hitting it). The prompt stays as onboarding; the
+GATE is what makes it robust. Not built yet — recorded as the direction; the trigger has fired.
