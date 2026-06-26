@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections
 import hashlib
 import json
 from pathlib import Path
@@ -146,3 +147,26 @@ def load(path: Path) -> EpMem:
         m.ingest(t["before"], t["action"], t.get("x"), t.get("y"), t["after"],
                  spent=t.get("spent"))
     return m
+
+
+def effects(rows: list) -> dict:
+    """Grounded per-action effects, straight from the recorded transitions: for each action, the
+    distribution of per-colour cell-count deltas (after − before). This answers the **resource /
+    quantity facts** a driver mis-estimates — the bar depletes, tokens are consumed, score moves
+    — from the record rather than from a model or a guess. It is deliberately COUNT-based, not
+    spatial: *where* things move is simmer's job; *how many* of each colour change is jotter's
+    ground truth (and a non-constant distribution, e.g. `11: -2×11, -4×24`, exposes a rate that
+    isn't fixed — exactly the fact an estimate gets wrong).
+
+    Returns `{action: {colour: Counter(delta -> occurrences)}}`, only non-zero deltas.
+    """
+    out: dict = {}
+    for t in rows:
+        a = t.get("action")
+        b = np.asarray(t["before"], np.int16)
+        af = np.asarray(t["after"], np.int16)
+        for c in set(np.unique(b).tolist()) | set(np.unique(af).tolist()):
+            d = int((af == c).sum()) - int((b == c).sum())
+            if d:
+                out.setdefault(a, {}).setdefault(int(c), collections.Counter())[d] += 1
+    return out

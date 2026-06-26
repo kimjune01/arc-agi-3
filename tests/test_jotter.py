@@ -84,3 +84,20 @@ def test_audit_gapless_vs_gap():
     g = gap.audit()
     assert not g["gapless"]                      # the drop is caught
     assert not g["count_matches_last_stamp"]     # 2 transitions but last stamp 3
+
+
+def test_effects_grounded_counts():
+    """jotter effects reports per-action per-colour count deltas from the record (resource facts)."""
+    from arc_agi_3.jotter.graph import effects
+    def g(bar):
+        x = np.full((4, 4), 3, np.int16); x[0, :bar] = 11; return x.tolist()
+    rows = [
+        {"action": "ACTION1", "before": g(4), "after": g(2)},   # colour 11: -2 (3: +2)
+        {"action": "ACTION1", "before": g(2), "after": g(0)},   # colour 11: -2
+        {"action": "ACTION2", "before": g(4), "after": g(1)},   # colour 11: -3
+    ]
+    e = effects(rows)
+    assert e["ACTION1"][11][-2] == 2          # ACTION1 depletes colour-11 by 2, witnessed twice
+    assert e["ACTION1"][3][+2] == 2           # vacated cells become corridor (3)
+    assert e["ACTION2"][11][-3] == 1
+    assert 0 not in e.get("ACTION1", {}).get(11, {})   # only non-zero deltas recorded

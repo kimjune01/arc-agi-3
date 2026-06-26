@@ -75,11 +75,30 @@ def audit(m: graph.EpMem) -> str:
     return "\n".join(lines)
 
 
+def effects_report(path) -> str:
+    """Grounded per-action effects from the record — the resource/quantity facts (the bar
+    depletes, tokens consumed, score moves) a driver should CHECK here, not estimate. A
+    non-constant distribution (e.g. `11: -2×11, -4×24`) exposes a rate that isn't fixed."""
+    import json
+    rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()] if path.exists() else []
+    if not rows:
+        return "(empty corpus — play with piper first)"
+    eff = graph.effects(rows)
+    lines = ["grounded per-action effects (colour: count-delta ×occurrences), from the record:"]
+    for a in sorted(eff, key=lambda a: str(a)):
+        lines.append(f"  {a}:")
+        for c in sorted(eff[a], key=lambda c: -sum(eff[a][c].values())):
+            dist = ", ".join(f"{d:+d}×{n}" for d, n in sorted(eff[a][c].items()))
+            lines.append(f"    colour {c:>2}: {dist}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(prog="jotter", description="Content-addressed episodic memory.")
     p.add_argument("--corpus", default=None)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stats", help="corpus / graph summary").set_defaults(fn=stats, want=None)
+    sub.add_parser("effects", help="grounded per-action effects (resource/quantity facts, from the record)").set_defaults(fn=None, want=None)
     sub.add_parser("audit", help="reconcile against piper via budget stamps").set_defaults(fn=audit, want=None)
     sub.add_parser("log", help="trajectory").set_defaults(fn=log, want=None)
     sub.add_parser("graph", help="deduped edge list").set_defaults(fn=graph_edges, want=None)
@@ -88,7 +107,13 @@ def main() -> None:
     args = p.parse_args()
 
     from pathlib import Path
-    m = graph.load(Path(args.corpus) if args.corpus else CORPUS)
+    corpus_path = Path(args.corpus) if args.corpus else CORPUS
+
+    if args.cmd == "effects":          # reads raw transitions (count facts), not the dedup graph
+        print(effects_report(corpus_path))
+        return
+
+    m = graph.load(corpus_path)
 
     if args.cmd == "has":
         known = m.has(args.hash)
