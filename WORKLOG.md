@@ -387,3 +387,36 @@ Fixes (both licensed by witnessed breakage):
   unique); run4/run2 LS20 unchanged (18 revisits/2 transpositions, 16 unique); 40 tests pass.
   The move-counter is now a generic factored element (witnessed across 3 games) — the first
   concrete piece of the factored-observer model June proposed.
+
+## 2026-06-26 — tn36 deep dive: it's a timed visual-programming game; the observation wall
+
+Tried to crack tn36 (driven by June, who supplied a screenshot). What it actually is: a
+**visual-programming / timed-movement puzzle** — a cursor traces a path through the
+checkerboard per a 5-icon "program" (the legend, each icon a cap+stem toggle), the two yellow
+`∩`/`∪` glyphs are the target shape, and a big blue **ball** at the bottom is the RUN button.
+Per June, the level-1 solution is "all configs on, click the ball → advance." Score is /7
+(7 levels).
+
+We did NOT crack it, and the reason is the valuable part — it broke the **observation**
+assumption the way earlier games broke navigation/config:
+- **The ARC-AGI-3 API has no poll endpoint.** Confirmed against the OpenAPI spec
+  (`docs.arcprize.org/arc3v1.yaml`): only `RESET` + `ACTION1–7` POSTs return frames; no GET
+  current-frame, no websocket. So observation is strictly *state-on-response* — you cannot
+  watch a real-time/timed animation without spending actions, and actions can be valid mid-
+  animation. This is an open, acknowledged gap: arcprize/ARC-AGI-3-Agents **#54** (zero-cost
+  state updates). piper inherits it: `look` only re-renders the last action's frame.
+- **tn36's ball is inert to `ACTION6`.** With all 5 icons verified on, a full sweep of the
+  ball region (rows 51–59, cols 32–40) is a counter-only no-op on *every* cell — identical to
+  clicking background — while the legend icons DO respond. Ruled out a coordinate error on our
+  side. Filed **arcprize/ARC-AGI-3-Agents #89** with a raw-API repro (observed-vs-expected +
+  clarifying question, not over-claimed).
+- Operational scars worth keeping: ~60% of rapid `ACTION6` POSTs fail silently (flaky API) →
+  use retry-until-`actions_spent`-increments; there's a ~1-row click-y offset vs the rendered
+  cell; `look` is cached (never refetches live state).
+
+Meta-yield (the point): the generality push found three assumption layers that don't survive a
+structurally new game — **navigation** (tn36 is click/program, not move), **config-vs-program**
+(the legend is a program, not a config to match), and now **observation** (turn-based,
+no live poll). The skeleton (perceive→hypothesize→act→reconcile→note) held throughout; the
+instance machinery and the observation model did not. tn36 banked as: blocked behind #54 +
+the apparently API-inert run button (#89); not programmatically winnable as-is.
