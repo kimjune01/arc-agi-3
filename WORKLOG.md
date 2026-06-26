@@ -100,3 +100,38 @@ Decision: no energy-bar module. The bestiary idea (recurring primitives →
 cold-start — pre-loaded uberty, hypothesis side per the poka-yoke boundary) is sound,
 but must key on STRUCTURE/geometry not colour, and the trigger is re-deriving the same
 structural primitive in a 2nd game. n=1 on every primitive so far; deferred.
+
+## 2026-06-25 — observed subagent drive (scored 1/7) + simmer passability refinement
+
+Ran a FRESH general-purpose subagent as the driver (no context inheritance), caught up
+only by EXPLAINER.md, on LS20. Watched it via its run's trace, not its play-by-play.
+
+**Drive result (run2).** Scored 1/7 in 17/30 actions. It discovered the full LS20 loop:
+slide avatar+tail by 5 (ACTION1-4 = up/down/left/right); collect the token (0/1) to
+toggle a carried-pattern HUD toward a lock target (3x3 of 9s); overlap the lock → +1 and
+the level regenerates. It only won after scripting an inline engine-backed BFS over the
+5-cell lattice — hand-planning a ~17-move route in ASCII broke.
+
+**Observability validated.** Reconciled its self-report against the OBJECTIVE record it
+can't fake: `trace.jsonl` (17 moves = 17 budget, 0 errors), `jotter audit` (stamps 1..17
+gapless), and `simmer test` (13/17). Its "where I broke" claim mapped 1:1 to the 4
+simmer-test failures, cell counts matching (60/5/50/1469). It left NO tracked-file edits
+and NO scripts (the BFS was ephemeral). Driver's subjective report == ground-truth trace.
+This is the design's central observability claim, validated on a real run. (Null worth
+recording: 0 transpositions / 0 revisits — jotter's dedup earned nothing this forward-only
+run.)
+
+**simmer refinement (the agent-IS-compiler loop, licensed by the 4 misses).** Studied the
+3 fixable transitions: the avatar was witnessed sliding through box-wall (5) and token
+(0/1) cells the "corridor-only" rule called blocking. Widened `_slide` passability:
+`PASSABLE = {3, 0, 1, 5}` (witnessed-only; 4 still blocks, 11 not asserted). Result
+13→14/17, run1 still 3/3, 38 tests pass. Remaining misses are the two DEFERRED classes,
+both reachability-irrelevant: the collected-token HUD repaint (`[9]` now just 10 cells of
+HUD churn, `[10]` 5 cells) and the level-regen (`[16]`, a goal-event boundary the engine
+shouldn't model). Modelled reachability (what a planner needs), not collectible state.
+
+**Next break named: dagger.** The subagent had to improvise a planner to win one level;
+the collect→match→deposit loop ×7 is a clean fixed decomposition, and the bottleneck is
+path-length vs budget (level 2's token/lock were each ~17 moves off). That's the in-head
+planner visibly breaking — the ratchet trigger for dagger. arbor still not forced (few
+claims, held fine in notes/head).

@@ -6,9 +6,18 @@ as a localized mismatch — refine it and re-test. PURE: no I/O, no mutation of 
 
 Hypotheses encoded so far (LS20, refined against the corpus 2026-06-25):
 - ACTION1-4 slide the avatar (colour 12) + its connected tail (colour 9) by 5 cells,
-  BUT only if the destination is clear corridor (3); a move into a wall (4) is blocked
+  BUT only if every destination cell is PASSABLE; a move into a wall (4) is blocked
   (the avatar stays). Refuted the naive "always 5" via `simmer test` (the left move ran
   into void). Vacated cells become corridor.
+- PASSABLE = corridor (3) plus the collectibles the avatar was WITNESSED sliding through
+  in run2's corpus: the token (0/1) and the box wall (5). Refined from "corridor only"
+  after `simmer test` localized three mispredicts where the avatar passed a collectible
+  the old rule called blocking. Witnessed-passable only — 4 still blocks; 11 (bar) is
+  NOT asserted passable (never witnessed entering it). This models REACHABILITY (what a
+  planner needs); it deliberately does NOT model collectible STATE effects (the token,
+  once overlapped, repaints a small carried-pattern HUD in the bottom-left box). That
+  effect is instance-specific and reachability-irrelevant, so it's left unmodelled — the
+  residual `simmer test` miss it leaves is expected, not a bug to chase.
 - Every move action depletes the energy bar (colour 11) by one column, from the left,
   whether or not the avatar actually moved (it still costs energy). Localized by the
   2-cell residual the slide rule left behind.
@@ -23,6 +32,11 @@ AVATAR = 12
 TAIL = 9
 BAR = 11
 STEP = 5
+
+# Cells the avatar+tail unit may slide INTO. Corridor plus the collectibles witnessed
+# passable in run2's corpus (token 0/1, box wall 5). Witnessed-only: 4 blocks; the bar
+# (11) is not asserted passable. Widen only when a transition witnesses a new colour.
+PASSABLE = frozenset({CORRIDOR, 0, 1, 5})
 
 # direction deltas for the four move actions (dy, dx)
 _DELTA = {"ACTION1": (-STEP, 0), "ACTION2": (STEP, 0),
@@ -58,8 +72,9 @@ def _slide(g: np.ndarray, dy: int, dx: int) -> np.ndarray:
     if nys.min() < 0 or nys.max() >= h or nxs.min() < 0 or nxs.max() >= w:
         return g  # boundary
     landing_outside_unit = ~mask[nys, nxs]
-    if not (g[nys[landing_outside_unit], nxs[landing_outside_unit]] == CORRIDOR).all():
-        return g  # a wall (or anything non-corridor) blocks the slide
+    dest = g[nys[landing_outside_unit], nxs[landing_outside_unit]]
+    if not np.isin(dest, list(PASSABLE)).all():
+        return g  # a wall (anything not PASSABLE) blocks the slide
     out = g.copy()
     out[ys, xs] = CORRIDOR     # vacate
     out[nys, nxs] = g[ys, xs]  # place the unit one step over
