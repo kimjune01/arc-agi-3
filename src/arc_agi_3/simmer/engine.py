@@ -36,7 +36,7 @@ STEP = 5
 # Cells the avatar+tail unit may slide INTO. Corridor plus the collectibles witnessed
 # passable in run2's corpus (token 0/1, box wall 5). Witnessed-only: 4 blocks; the bar
 # (11) is not asserted passable. Widen only when a transition witnesses a new colour.
-PASSABLE = frozenset({CORRIDOR, 0, 1, 5})
+PASSABLE = frozenset({CORRIDOR, 0, 1, 5, 11})  # 11: witnessed run4 lvl2 — maze 11-clusters are ENERGY PICKUPS (slide onto one refills bar to full, consumes the cluster). Bar at rows60+ is walled off so adding 11 is safe for routing.
 
 # direction deltas for the four move actions (dy, dx)
 _DELTA = {"ACTION1": (-STEP, 0), "ACTION2": (STEP, 0),
