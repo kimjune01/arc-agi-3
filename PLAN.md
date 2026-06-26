@@ -65,13 +65,24 @@ diffing** — only possible because the same code drives both. (So "identical se
 is the wrong test: identical *signature*, divergent *cost/exactness*. The reconcile
 step exists precisely to measure the contract gap.)
 
-### simmer is compiled from arbor
-arbor holds the mechanic-claims (declarative); **simmer is their executable form** —
-the witnessed claims composed into a pure functional `step`. `arbor → simmer` is the
-compile (`arbor engine` folds the live, un-killed claims into `step`). When the agent
-abduces a new claim into arbor, simmer recompiles. (Same knowledge, two paradigms:
-declarative claims in arbor, functional engine in simmer — four-schools'
-declarative↔functional pair.)
+### simmer is the agent's hand-edited engine (the agent IS the compiler)
+**simmer's `step` is edited directly — that's intentional, not a stopgap.** The agent
+writes each learned mechanic straight into `engine.py`; editing the code IS the abductive
+leap (the abductor gates and composes but doesn't invent — the rule body is the reasoner's).
+So "arbor → simmer compile" is the **reasoner's hand** translating its understanding into
+the functional engine, NOT an automated codegen pass. Two reasons direct editing is the
+right permanent design: (1) the **differential test already buys the safety a claim-DSL
+would** — any bad edit surfaces as a failed transition, localized to the cells it got wrong
+(`simmer test`), so a restricted representation would only trade away code's full
+expressiveness for a guarantee the corpus already gives. Edit freely (uberty), the test
+secures it (security); the freedom is bounded by the test, not by the representation. (2)
+the reasoner is best at writing code, and direct editing puts nothing between its idea and
+the executable form. arbor's role is the claim **ledger** (which mechanic is alive/killed/
+witnessed, the provenance), and a claim's executable form just *references* the engine edit
+(the diff to `engine.py`, content-addressed). An automated compile-from-arbor stays optional
+for composing many rules later, but it's not a prerequisite and may never be needed. (Same
+knowledge, two paradigms: declarative claims/ledger in arbor, functional engine in simmer —
+four-schools' declarative↔functional pair.)
 
 **The abductor IS the synthesizer; jotter's history IS the trial corpus.** A
 mechanic-claim's `--trial` is "replay jotter's recorded transitions through the

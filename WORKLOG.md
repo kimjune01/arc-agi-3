@@ -1132,3 +1132,19 @@ This is the abductor/uberty→security loop concretely: a free hypothesis (ubert
 verified engine (security) by differential test against the grounded corpus, the gap localized
 so the refinement is surgical. arbor→simmer compilation still deferred (engine is hand-written
 prose-first); when claims multiply, compile instead of hand-edit.
+
+### CORRECTION: editing simmer directly is INTENTIONAL, not a stopgap (the agent IS the compiler)
+June corrected my "hand-editing is the prose-first precursor to automated arbor→simmer
+compilation" framing. Direct editing is the intended interface, permanently. Reasons: (1) the
+abductive leap is irreducibly the reasoner's, and writing the rule into engine.py IS that leap
+— a claim-DSL just inserts a translation layer for no gain; (2) the **differential test already
+buys the safety a DSL would** — any bad edit surfaces as a failed transition localized to the
+wrong cells, so a restricted representation would only trade away code's expressiveness for a
+guarantee the corpus already gives (edit freely=uberty, test secures=security, freedom bounded
+by the test not the representation); (3) the reasoner is best at writing code. So "arbor→simmer
+compile" = the reasoner's HAND, not automated codegen; arbor becomes the claim LEDGER (alive/
+killed/witnessed + provenance), a claim's executable form just REFERENCES the engine diff
+(content-addressed). Automated compile stays optional for composing many rules; not a
+prerequisite, may never be needed. Retracts the prior entry's "compile instead of hand-edit"
+as the end state. PLAN.md "### simmer is compiled from arbor" → "### simmer is the agent's
+hand-edited engine".
