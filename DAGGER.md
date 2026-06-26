@@ -238,6 +238,29 @@ lock" was false at `overlap-lock`'s precondition, that *names* a missing child (
 collect, or a route through a particular token) and `from-kill` inserts it. The win condition
 is `deposit-one-point` repeated ×7 — the same node, seven hits.
 
+## Resource admissibility = A* over a graded graph (the live extension)
+
+run4 broke the typing in the one place it had no slot: a decomposition can commute
+geometrically (every child reachable in simmer) yet be **inexecutable** under a whole-sequence
+resource budget (route length vs energy, with reset-on-depletion and 3 lives). The fix is a
+route-node **admissibility witness**, NOT a numeric planner:
+
+- the resource is a **grade** (energy): the cost monoid `(ℕ∪{∞}, +, 0)`; a route's grade is the
+  sum of its steps; admissible iff `grade ≤ budget`. Grades **compose** (a monoid action), they
+  are not constraints to **solve** — that is what keeps this out of LP / PDDL.
+- compute it as **A\*** over `(cell, energy, lives, carried)`: edges from the witnessed
+  `EnergyClaim` (cost/move, refill cells, reset rule), `h` = lattice distance, and
+  **node identity = jotter's canonical hash** (the reconverging lattice collapses correctly
+  only with the move-counter masked). simmer stays pure geometry; the planner threads the grade;
+  the driver refuses to pay piper for an inadmissible route; an infeasible decomposition is
+  `from-kill`ed as resource-infeasible.
+- this strengthens the invariant from geometric to **executable** entailment:
+  `compose(children) ⊨ parent` now means *reaches the postcondition AND grade ≤ budget*.
+
+The full framing — graded(-Elgot) monad, the bounded-loop/Layer-2 vs unbounded/Layer-3 =
+deduction/induction line, graded Hoare as the typing home — is in [GRADES.md](GRADES.md). The
+`unmodellable` cost-class above is exactly Layer 3 (`m* = ∞`): witness it, don't deduce it.
+
 ## Deferred until it goes off the rails
 
 Per the standing call: no formal machinery yet. Specifically deferred —

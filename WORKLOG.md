@@ -283,3 +283,28 @@ start). Pickups (small 11, higher up) kept as salient. Payoff: run4 79→39 uniq
 The ~20 actions the drive spent reverse-engineering the reset would have been a free "I'm back
 at level-start" revisit signal with this in place — induction made cheap by better content-
 addressing. LS20-specific by design (widen at game 2).
+
+## 2026-06-25 — the resource gate is a graded(-Elgot) monad (GRADES.md)
+
+Design thread (codex consult + the LP-smell instinct) converged on the right shape for the
+run4 resource constraint, then on its theory. New `GRADES.md` captures it; DAGGER.md gets the
+implementation subsection (A* admissibility witness) + a pointer.
+- The energy gate is a **grade**, not an LP constraint: cost monoid `(ℕ∪{∞},+,0)`, grades
+  COMPOSE (monoid action) rather than being solved. Implement as **A\*** over
+  `(cell, energy, lives, carried)`, `h`=lattice distance, node identity = jotter's canonical
+  hash; simmer stays pure geometry; `EnergyClaim` is the witnessed grading; driver gates piper
+  spend; infeasible decomposition → `from-kill`. A* = least-grade morphism in the graded
+  monad's Kleisli category. codex's verdict (don't put energy in simmer; admissibility witness
+  in dagger; resource-constrained-path not PDDL) holds; the LP smell was real and correctly
+  routed us to search-not-solve.
+- Reset = graded **Elgot** dagger (June's `graded_elgot_in_python.py`), but BOUNDED by a
+  well-founded fuel (lives ≤3, energy ~21/leg) → we sit in the draft's Layer 2 (known `k`),
+  never the Layer-3 closure gap (`star_additive(m)=∞`, the unpublished graded dagger).
+- **The payoff identification**: Layer 2 (bounded, finite static grade) vs Layer 3 (unbounded,
+  `m*=∞`) IS the deduction/induction = free/paid line. So the graded-Elgot gap is the
+  categorical signature of the `unmodellable` cost-class in DAGGER.md — a trial whose grade is
+  statically undefined, resolvable only by paid induction. Justifies `unmodellable` as a real
+  third class, not a hedge.
+- Typing home = graded Hoare (`reading/.../hoare-graded`); lattice-collapse soundness = Markov
+  / path-independence (Fritz-Perrone). lattice + graded + content-addressed dedup = one object:
+  a cost-graded deterministic (Markov) reachability monad. Nothing built yet — theory pinned.
