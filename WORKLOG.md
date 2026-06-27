@@ -598,3 +598,31 @@ Net: dagger = goal-regression (win-down) + repeat-compression (act-up), candidat
 scoring traces in jotter, KEPT by an MDL criterion, validated by the commuting check, dreamed in
 simmer. The MDL keep-criterion is the load-bearing import — it's what makes the decomposition
 cache converge instead of bloat.
+
+## 2026-06-27 — layers of determinism: condition / enforcer / strength
+
+Named the harness-gate direction (the 2026-06-26 "prompts are suggestions" intent) into a bounded
+vocabulary, prior art = `documents/sweep` (andon, poka-yoke intake contracts, `andon_unexpected`
+metric). Separated two objects DbC had been conflating:
+- **condition** = pre/postcondition (the spec); **enforcer** = pregate/postgate (the mechanism
+  that makes it hold or refuses). A pregate enforces a precondition, a postgate a postcondition.
+  This unifies the process disciplines with dagger's existing composition conditions (same Hoare
+  object).
+- **strength** = ratchet **prompt → gate → matcher** (one condition pressed three ways: stated /
+  exact-enforced / tolerantly-enforced). matcher is the gate's decision procedure for inexact
+  conditions (= the planned prose→subsumption hardening), not a separate layer.
+- Names bounded by construction: `{module}-gate` per pre-API precondition — **dagger-gate** (live
+  plan node), **arbor-gate** (live hypothesis + prediction), **jotter-gate** (plan vetted vs
+  `jotter effects`); **postgate** = reconcile (`jotter diff` → witness/kill, surprise engine made
+  mechanical; fires only when a simmer plan exists). Dual-provenance needs no name: dagger-gate ∧
+  arbor-gate gives it free.
+- **Three exits, crash is default.** hold / bounce (known violation, instructive, zero budget) /
+  crash (unanticipated, halt loudly, no silent swallow). Second ratchet **crash → handle**: promote
+  a recurring crash to a bounce or recovery case-by-case; crash count falling = `andon_unexpected`
+  dropping. Boundary holds: crash on process failure, never on a wrong hypothesis (that's a postgate
+  kill).
+- sweep's lesson carried over: shipping the check ≠ migrating callers (`pokayoke.py` shipped 6
+  intake fns, 0 callers). Each gate is two units: define the check, then route the act/commit path
+  through it. Only the second moves the metric.
+
+Written to PLAN.md (under design-by-contract, §poka-yoke). Not built yet — this is the spec.

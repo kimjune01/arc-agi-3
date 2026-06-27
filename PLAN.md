@@ -428,6 +428,55 @@ Hoare logic / Eiffel DbC). Each command carries a three-part contract:
   raising a typed error on violation (again, an explicit guard, not `assert`: -O-safe).
   The laws that make a loose consolidate converge, machine-checked not just documented.
 
+**Layers of determinism: conditions, enforcers, strength.** DbC gives the *what* (pre/post
+conditions); this names the *who enforces it* and *how hard*. Separate the two objects:
+- **condition** = pre / post. The declarative spec, the assertion that must hold (Hoare). dagger
+  already speaks this (composability: `B's precond ⊨ A's postcond`).
+- **enforcer** = **pregate** / **postgate**. The runtime mechanism that makes a condition hold
+  at the action boundary or refuses. A pregate enforces a precondition (fires pre-API, zero
+  budget); a postgate enforces a postcondition (fires after the action lands). This unifies the
+  process disciplines with dagger's composition conditions: same object, both are Hoare contracts.
+- **strength** = a ratchet, **prompt → gate → matcher**, one condition pressed three ways:
+  *prompt* (stated in EXPLAINER/AGENT text, rides on goodwill, silently ignorable: run11 ignored
+  "note what you learn", 50 moves/0 notes), *gate* (enforced, exact match, a free bounce), *matcher*
+  (enforced but tolerant: a subsumption decision when the condition can't be `==`, e.g. "does
+  'block left-aligned' satisfy 'block adjacent to wall'?"). matcher is not a layer above gate; it
+  is the gate's *decision procedure* for inexact conditions (= the "soft prose typing → structural
+  subsumption" hardening already planned for pre/post matching). A wrong matcher is a wasted
+  rollout, not a broken plan, so tolerance is safe here.
+
+Naming stays bounded by construction: timing is always `pre`/`post`; a pregate check is always
+`{module}-gate`, named by which precondition it enforces:
+- **dagger-gate** (pre) — the action names a live plan/action node (`dagger:<id>`).
+- **arbor-gate** (pre) — the action names a live hypothesis it tests, with a prediction; a blind
+  probe still names an open `arbor:#<open>`.
+- **jotter-gate** (pre) — the plan is vetted against grounded facts (`jotter effects`) before it
+  runs (the run13 energy-budget miss, as a gate).
+- **postgate** — after the action: `jotter diff` computes `piper ⊕ simmer`, records witness/kill.
+  This is the surprise engine made mechanical instead of optional. It has a precondition the
+  pregates lack: a simmer plan must exist to reconcile against, so it fires only when one does.
+
+Dual-provenance needs no name of its own: an action passing both dagger-gate and arbor-gate is by
+construction tethered to both refs. These gates guard **process** invariants (how you reason),
+never game hypotheses, so they respect "guard the invariants, never the hypotheses": the harness
+enforces *how you act*, never *what the game's rules are*.
+
+**Three exits, and crash is the default.** Like poka-yoke, a gate fails loudly. Each gate has
+exactly three exits, and (2) and (3) must stay distinct:
+1. **hold** → proceed.
+2. **bounce** → a *known* violation: instructive, expected, zero budget, names the rule. The free
+   bounce, not a backstep.
+3. **crash** → anything else: an exception, an unanticipated shape, a state the harness has no
+   model for. Halt loudly. No silent swallow, no degraded guess. The crash is the andon cord, and
+   it is data: it names a case we didn't anticipate.
+
+This gives a second ratchet alongside prompt → gate → matcher: **crash → handle.** Crash is the
+default for the unanticipated; when a crash class recurs and we understand it, we promote it
+case-by-case, either to a bounce (a new named precondition) or to a deliberate recovery. Crash
+count falling is the health signal (sweep's `andon_unexpected` dropping). The boundary holds:
+crash on unexpected *process* failure, never on a wrong *hypothesis* (a wrong belief is a postgate
+witness/kill, not a crash).
+
 **Onboarding by progressive disclosure** (per the explainer decision): each tool
 embeds a short **driving-contract** string (the loop, printed on no-args / `<tool>
 help`) = the explainer/map; `<tool> --help` = role + subcommands + key principle;
