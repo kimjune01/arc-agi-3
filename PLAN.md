@@ -443,7 +443,11 @@ conditions); this names the *who enforces it* and *how hard*. Separate the two o
   'block left-aligned' satisfy 'block adjacent to wall'?"). matcher is not a layer above gate; it
   is the gate's *decision procedure* for inexact conditions (= the "soft prose typing → structural
   subsumption" hardening already planned for pre/post matching). A wrong matcher is a wasted
-  rollout, not a broken plan, so tolerance is safe here.
+  rollout, not a broken plan, so tolerance is safe here. Safe only while the matcher stays on
+  the predicate: it *proposes* a composition edge and the rollout ratifies it. Keep it off the
+  dedup key and out of any recursive abstraction. There a single wrong match merges incompatible
+  nodes and corrupts the cache, a break execution can't catch. Dedup stays exact (content-
+  addressed); matcher for the predicate, exact equality for identity.
 
 Naming stays bounded by construction: timing is always `pre`/`post`; a pregate check is always
 `{module}-gate`, named by which precondition it enforces:

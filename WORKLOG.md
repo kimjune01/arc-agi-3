@@ -626,3 +626,35 @@ metric). Separated two objects DbC had been conflating:
   through it. Only the second moves the metric.
 
 Written to PLAN.md (under design-by-contract, §poka-yoke). Not built yet — this is the spec.
+
+## 2026-06-27 — gates built end-to-end; dag-building is a matcher, not structure
+
+Built the gate scheme (commit 101d605). New `arcg/gates.py` = `UsageError` + four gates, each
+with the three exits (hold / bounce=typed UsageError / crash=uncaught). Single commit boundary
+= `layer0_protocol.act()` (the API commit `c.act()` + the jotter commit `append_transition` both
+live there; every caller funnels through it). Routed:
+- **dagger-gate** / **arbor-gate** (pre): fire at the TOP of `act()`, before `store.load()` —
+  pre-API, zero budget, zero I/O. Well-formedness only (`dagger:<id>` / `arbor:#<id>`); arbor
+  and dagger have no module/registry yet, so liveness is a TODO.
+- **postgate** (post): after the frame lands, only when a `pred` exists — `piper ⊕ simmer` →
+  witness/kill.
+- **jotter-gate**: defined+tested but routing DEFERRED. Its home is the planning seam
+  (`dagger.plan`, unbuilt); per-act vetting would bounce every novel action and block
+  exploration. Flagged, not fake-routed (avoids another pokayoke "6 checks, 0 callers").
+Migrated all callers (cli `act` + `--dagger`/`--arbor`, intent move/click/interact/undo, replay)
+through the pregates. Full suite green (52).
+
+Design refinement (the one to keep): **building the action dag is not a structural lookup.** An
+edge B→A is valid when `B's postcond ⊨ A's precond`, and that `⊨` is subsumption — a
+**generalize-or-specialize judgment per edge** (does the concrete effect specialize the general
+goal, or does the goal generalize up to meet it). So dag-building runs a **matcher** (tolerant —
+a wrong call is a wasted free rollout, not a broken plan), not a **gate** (exact). Consequence
+for the gate I built: the dagger-gate's "live node" check is a thin reader of the dag's
+reachability verdict, never a registry `==`; the judgment lives upstream at `dagger.plan`. This
+reframes task #6 (dagger-matcher) — it's the **engine of dag-building**, not a stretch bolt-on.
+TODO sharpened in `gates.py::dagger_gate`.
+
+Also fixed the autoenv annoyance: the project `.env` (just `ARC_API_KEY`) was being read as an
+autoenv script and prompting `Authorize this file? (y/n/d)` on every shell, eating heredoc stdin.
+Moved the key to `~/.zshrc`, removed `.env` (autoenv has nothing to trigger on; `os.getenv` still
+resolves it in the interactive shell).

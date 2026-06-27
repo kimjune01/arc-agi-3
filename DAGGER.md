@@ -105,6 +105,46 @@ Soft typing is safe because a wrong prose match costs a wasted simmer rollout, n
 plan — execution verifies. So the reasoner is *allowed* to be sloppy, and we learn whether
 pre/post composition is even the right frame before building any machinery for it.
 
+That safety holds only while the match stays on the predicate. A tolerant `⊨` may *propose* a
+composition edge; keep it away from dedup and from any recursive abstraction. Dedup stays exact
+(content-addressed, grid→grid, with no correspondence to judge), so a wrong proposal costs one
+rollout and dies. Were the loose match allowed to decide node identity, one misjudgment would
+merge two incompatible methods and corrupt the cache, a failure execution can't catch (it
+verifies a single rollout, not the equality of two nodes). Matcher for the predicate; exact
+equality for identity. The real cost in the predicate check is object correspondence, so keep
+the abduced predicate language bounded (DL-lite: typed objects, unary/binary relations, bounded
+counts and spatial relations) before the `⊨` judgment quietly becomes subgraph matching.
+
+## Interface (outer): committed contracts, judged interior
+
+The verb set and its *algebraic* contracts are fixed by the cache laws and the morphism. The `⊨`
+decision procedure and the node's reliability schema stay judged/deferred (§soft-typing,
+§deferred). So this commits the outer shape and names two holes rather than filling them.
+
+**Node** = the morphism. Fields: `post` (prose goal it makes true, its codomain), `pre` (prose
+applicability, its domain), and a body that is either a `leaf` (one primitive action token) or a
+`compound` (`children` + `mode ∈ {sequence, conjunction}`). `status` carries the write-once
+verdict (`open → live | killed`) and is OUTSIDE the identity key, so a kill never rewrites the
+ref. Identity is the content-address over the NORMALIZED-EXACT remaining fields, never a matcher
+call.
+
+| verb | contract | law |
+|------|----------|-----|
+| `init <actions>` | seed = apex `win game` (open) + one leaf per action | determined, no freedom |
+| `get <id>` | resolve a `dagger:<id>` ref to a node, or MISS | total; MISS is data, not error |
+| `plan <goal>` | hit returns a cached decomposition; miss returns a HOLE (the open subgoal to abduce) | JIT-on-miss |
+| `decompose <goal> <children> <mode>` | write a compound node; `compose(children) ⊨ goal` TESTED in simmer | write-once verdict |
+| `put <node>` | idempotent insert, content-addressed dedup, returns the canonical node | idempotent |
+| `merge <a> <b>` | union two DAGs | commutative, idempotent (meet law) |
+
+Two holes, named not filled:
+- `⊨` inside `plan`/`decompose` is the **matcher**: prose + judgment, optionally simmer-checked,
+  propose-only (it never keys `put`'s dedup). Drafted as an exact normalized-string match until it
+  visibly mispredicts.
+- the node **record schema** past `status` is drafted minimal; the reliability fields
+  (support/success/failure counts, abstraction version) are discovered on the first drive that
+  JIT-misses, not authored now.
+
 ## Expressing uncertainty: a status and a trial, never a probability
 
 Almost every node is a **guess** before it is tested — a freshly abduced decomposition, an
