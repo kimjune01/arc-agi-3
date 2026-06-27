@@ -37,11 +37,12 @@ def dagger_gate(ref: str | None) -> str:
     """Pregate: the action must name the plan/action node it executes (`dagger:<id>`).
 
     Process invariant — *that* the driver names its plan step, never *what* the game is.
-    TODO: check the node is LIVE against the action-DAG once `dagger` exists. "Live" =
-    reachable in the dag, and reachability is established by composition edges
-    (B's postcond ⊨ A's precond). That ⊨ is subsumption, not ==: a generalize-or-specialize
-    JUDGMENT per edge, so the real check is a matcher (tolerant), not a gate (exact) — see
-    the prompt->gate->matcher ratchet. Well-formedness only for now (the gate floor).
+    TODO: wire liveness. The reader now exists (`dagger.get(dag, ref)` -> `dagger.live(node)`);
+    what's missing is WHERE the Dag lives so the act path can reach it (session/store) and the
+    driver passing real node ids from `dagger.plan()` instead of the placeholder dagger:intent:*
+    refs the convenience wrappers pass. Note `dagger.live` only checks not-killed; full liveness
+    = REACHABILITY in the dag, a matcher-judged property (B's postcond ⊨ A's precond is
+    generalize-or-specialize, tolerant), not a registry ==. Well-formedness only here for now.
     """
     if ref is None:
         raise UsageError(

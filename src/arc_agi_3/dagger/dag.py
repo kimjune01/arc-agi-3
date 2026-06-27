@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 
 WIN = "win game"   # the apex goal; the one node born undecomposed.
 _MODES = ("sequence", "conjunction")
+# Verdict precedence for the join. killed dominates (from-kill strictly dominates, PLAN.md
+# §iteration-invariant); a status only ratchets up, never silently downgrades.
+_STATUS_RANK = {"open": 0, "live": 1, "killed": 2}
 
 
 def _norm(s: str | None) -> str:
@@ -83,10 +86,16 @@ def init(actions) -> Dag:
 
 
 def put(dag: Dag, node: Node) -> Node:
-    """Idempotent insert; content-addressed dedup. Returns the canonical (first-seen) node.
-    SOFT SPOT: first-seen-wins means re-putting a node with a flipped status is ignored — status
-    transitions must go through a verdict op (kill/witness), not a bare re-put. Not built yet."""
-    return dag.nodes.setdefault(node.id, node)
+    """Idempotent insert with content-addressed dedup; returns the canonical node. On an id
+    collision the DOMINANT status wins (killed > live > open), so put is a join — order-
+    independent, which is exactly what makes merge commutative + idempotent (the meet law).
+    A status ratchets up, never down. (Deliberate verdict verbs kill/witness are still TODO;
+    the join below is what merge needs to be lawful.)"""
+    cur = dag.nodes.get(node.id)
+    if cur is None or _STATUS_RANK[node.status] > _STATUS_RANK[cur.status]:
+        dag.nodes[node.id] = node
+        return node
+    return cur
 
 
 def get(dag: Dag, ref: str) -> Node | None:
@@ -128,10 +137,9 @@ def decompose(dag: Dag, goal: str, children, mode: str) -> Node:
 
 
 def merge(a: Dag, b: Dag) -> Dag:
-    """Union two DAGs. Meant to be commutative + idempotent (the meet law). SOFT SPOT: when the
-    same id appears in both with DIFFERENT status (one killed, one open), first-seen-wins makes
-    this order-dependent and breaks commutativity. Correct resolution is domination (from-kill
-    dominates open), not insertion order — not built yet. UNVERIFIED for status conflicts."""
+    """Union two DAGs. Commutative + idempotent (the meet law): merge(a,b) == merge(b,a) and
+    merge(a,a) == a. Content-addressed ids make node-union a set union, and put resolves any
+    status conflict by domination (killed > live > open), so insertion order doesn't matter."""
     out = Dag()
     for n in list(a.nodes.values()) + list(b.nodes.values()):
         put(out, n)
