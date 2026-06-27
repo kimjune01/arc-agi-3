@@ -5,6 +5,9 @@
 `jotter log`          — the trajectory as state-hashes and actions.
 `jotter show <hash>`  — render the grid for a state-hash.
 `jotter graph`        — the deduped edge list (from --action--> to).
+`jotter effects`      — grounded per-action count deltas (resource/quantity facts).
+`jotter audit`        — reconcile the corpus against piper's budget stamps.
+`jotter trace`        — content-addressed trace of the play (the series-evidence object).
 
 Corpus is `$ARCG_STATE_DIR/transitions.jsonl`.
 """
@@ -93,12 +96,29 @@ def effects_report(path) -> str:
     return "\n".join(lines)
 
 
+def trace_report(path) -> str:
+    """The content-addressed trace of the recorded play — the series-evidence object, with a
+    stable id you can cite as provenance (re-recording the same play reproduces it)."""
+    import json
+    rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()] if path.exists() else []
+    tr = graph.trace(rows)
+    if not tr["id"]:
+        return "(empty corpus — play with piper first)"
+    lines = [f"trace {tr['id']}  ({tr['len']} steps)  "
+             f"initial {tr['initial']} -> final {tr['final']}"]
+    for i, s in enumerate(tr["steps"]):
+        coord = f" ({s['x']},{s['y']})" if s["x"] is not None else ""
+        lines.append(f"{i:3} {s['before']} --{s['action']}{coord}--> {s['after']}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(prog="jotter", description="Content-addressed episodic memory.")
     p.add_argument("--corpus", default=None)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stats", help="corpus / graph summary").set_defaults(fn=stats, want=None)
     sub.add_parser("effects", help="grounded per-action effects (resource/quantity facts, from the record)").set_defaults(fn=None, want=None)
+    sub.add_parser("trace", help="content-addressed trace of the recorded play (the series-evidence object)").set_defaults(fn=None, want=None)
     sub.add_parser("audit", help="reconcile against piper via budget stamps").set_defaults(fn=audit, want=None)
     sub.add_parser("log", help="trajectory").set_defaults(fn=log, want=None)
     sub.add_parser("graph", help="deduped edge list").set_defaults(fn=graph_edges, want=None)
@@ -111,6 +131,10 @@ def main() -> None:
 
     if args.cmd == "effects":          # reads raw transitions (count facts), not the dedup graph
         print(effects_report(corpus_path))
+        return
+
+    if args.cmd == "trace":            # reads raw transitions in order (the series), not the graph
+        print(trace_report(corpus_path))
         return
 
     m = graph.load(corpus_path)

@@ -658,3 +658,35 @@ Also fixed the autoenv annoyance: the project `.env` (just `ARC_API_KEY`) was be
 autoenv script and prompting `Authorize this file? (y/n/d)` on every shell, eating heredoc stdin.
 Moved the key to `~/.zshrc`, removed `.env` (autoenv has nothing to trigger on; `os.getenv` still
 resolves it in the interactive shell).
+
+## 2026-06-27 — evidence layer: content-addressed trace + live low-budget run
+
+Long design thread (verifiable-knowledge → hypothesis↔(proto-)node → verdict provenance via git
+commit/range/branch/annotated-tag → series=compound-node=commit-range), then a codex blindspot
+pass. Codex's load-bearing hits, kept as standing corrections (not built yet):
+- **idempotent storage ≠ idempotent knowledge.** Our guarantee is correctly scoped to the EVIDENCE
+  log (append-only, monotone, content-addressed). BELIEF (verdicts, credence) is a derived,
+  non-monotone, versioned query that sits ABOVE it. Don't conflate.
+- a re-runnable verdict only reproduces if the whole evaluator stack is frozen → a surprise warrant
+  is a CLOSURE (source-repo commit + arbor snapshot + input), not "two hashes".
+- verdict-id = hash(canonical record), NOT a git tag sha (tag hashes fold in tagger/timestamp).
+- kill the JUSTIFICATION, not the claim (ATMS granularity); first divergence is a CANDIDATE, not
+  the culprit; the tolerant matcher must not authorize a PAID action (certified vs possible
+  composition — routes into the dagger-gate); simmer evidence is correlated, only piper witnesses
+  are independent supports.
+- HELD against codex's prod-scale push: no event store / CAS / Nix / full ATMS. Single-agent
+  serial, correctness over wall-clock, git+jsonl is the right cheap substrate (user call).
+
+Built the unambiguous floor of the evidence layer: `jotter.graph.trace(rows)` — a content-addressed
+trace object `{id, initial, steps, final}`, the series-evidence unit, hashed directly (not a git
+range, whose meaning shifts under rewrite/merge). States under the same counter-masked identity as
+the dedup graph. `jotter trace` CLI + sanity test. Full suite 60.
+
+Live low-budget run (LS20, budget cap 6, 5 moves):
+- trace `0ed590a18109`, reproducible across re-reads (content-address holds).
+- dedup caught down-blocked-at-wall: `ACTION2` self-loops on the same masked hash while `effects`
+  shows colour-11 (the counter) still ticking −2 — position no-op, budget meter still spends. The
+  two evidence views disagree correctly.
+- `jotter audit`: gapless stamps 1..5, piper actions_spent 5 == jotter 5 (faithful, no drops).
+- gates held live: every `arcg move` routed through dagger-gate + arbor-gate and passed.
+Score 0 (5 unguided moves). The gate contract layer survived a real API run.

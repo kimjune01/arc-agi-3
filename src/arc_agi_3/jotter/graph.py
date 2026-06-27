@@ -149,6 +149,31 @@ def load(path: Path) -> EpMem:
     return m
 
 
+def trace(rows: list) -> dict:
+    """A content-addressed TRACE: the ordered action series as a first-class evidence object.
+
+    The series-hypothesis unit. Rather than leaning on a git commit RANGE (whose meaning shifts
+    under rewrite/merge/shallow-clone), the trace is hashed directly: re-recording the same play
+    yields the same id, so it is a stable, reproducible key. States use the same counter-masked
+    hash as the dedup graph, so trace identity agrees with state identity.
+
+    Returns `{id, initial, steps:[{action,x,y,before,after}], final, len}`; id is None if empty.
+    NOTE: this is the EVIDENCE layer only (what happened, content-addressed). Belief about it
+    (verdicts, credence) is a derived, non-monotone query that lives above and stays deferred.
+    """
+    if not rows:
+        return {"id": None, "initial": None, "steps": [], "final": None, "len": 0}
+    states = [rows[0]["before"]] + [t["after"] for t in rows]
+    counter = detect_counter(states)
+    steps = [{"action": t["action"], "x": t.get("x"), "y": t.get("y"),
+              "before": state_hash(t["before"], counter),
+              "after": state_hash(t["after"], counter)} for t in rows]
+    core = {"initial": steps[0]["before"], "steps": steps, "final": steps[-1]["after"]}
+    tid = hashlib.sha1(
+        json.dumps(core, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:12]
+    return {"id": tid, **core, "len": len(steps)}
+
+
 def effects(rows: list) -> dict:
     """Grounded per-action effects, straight from the recorded transitions: for each action, the
     distribution of per-colour cell-count deltas (after − before). This answers the **resource /

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from arc_agi_3.jotter.graph import EpMem, detect_counter, state_hash
+from arc_agi_3.jotter.graph import EpMem, detect_counter, state_hash, trace
 
 
 def _g(seed):
@@ -101,3 +101,19 @@ def test_effects_grounded_counts():
     assert e["ACTION1"][3][+2] == 2           # vacated cells become corridor (3)
     assert e["ACTION2"][11][-3] == 1
     assert 0 not in e.get("ACTION1", {}).get(11, {})   # only non-zero deltas recorded
+
+
+def test_trace_is_content_addressed_and_ordered():
+    """jotter trace is the series-evidence object: same play -> same id, reorder -> new id."""
+    def g(seed):
+        x = np.full((4, 4), 3, np.int16); x[0, 0] = seed; return x.tolist()
+    rows = [
+        {"action": "ACTION1", "before": g(1), "after": g(2)},
+        {"action": "ACTION6", "x": 5, "y": 7, "before": g(2), "after": g(3)},
+    ]
+    t1 = trace(rows)
+    assert t1["id"] is not None and t1["len"] == 2
+    assert t1["initial"] == state_hash(g(1)) and t1["final"] == state_hash(g(3))
+    assert trace(rows)["id"] == t1["id"]                 # reproducible (content-addressed)
+    assert trace(list(reversed(rows)))["id"] != t1["id"] # order is load-bearing
+    assert trace([])["id"] is None                       # empty corpus
