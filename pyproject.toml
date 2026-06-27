@@ -19,6 +19,8 @@ arcg = "arc_agi_3.arcg.cli:main"
 simmer = "arc_agi_3.simmer.cli:main"
 jotter = "arc_agi_3.jotter.cli:main"
 drive = "arc_agi_3.driver.cli:main"
+reason = "arc_agi_3.agents.reasoner:main"
+dagger = "arc_agi_3.dagger.cli:main"
 
 [dependency-groups]
 dev = [

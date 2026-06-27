@@ -752,3 +752,32 @@ Live drives on LS20 drove the policy fixes (the value of a real run):
 Score still 0 — exploration isn't goal-directed (no dagger.plan decomposition, no key/lock model).
 That's the next layer: a plan toward the lock + the win-trigger, which is the cognitive step. Full
 suite 62. `drive` registered in [project.scripts].
+
+## 2026-06-27 — the reasoner: tool-using agent, one experiment unit per session
+
+Pivoted off the one-shot mega-prompt. First tried suggesting goal-decomposition (>=2 subgoals) in
+the llm_agent SYSTEM prompt and observed traces: the agent used the `plan` field but mostly held ONE
+active subgoal, and it was bottlenecked upstream — stuck in exploration because raw perception is
+confounded by the move-counter (the SAME confound that looped the driver), so it never reached the
+planning regime. Conclusion: don't gate branching; the binding constraint was perception.
+
+So the real fix is tool freedom (PLAN.md's "Claude Code = reasoner"). New `agents/reasoner.py`: an
+outer harness starts the game + owns its lifecycle, then spawns a FRESH agentic `claude` headless
+session per experiment unit (`--allowedTools` = the project CLIs, `--max-turns` backstop). The
+session re-hydrates from the persistent memory, does ONE unit (test one hypothesis with the fewest
+real actions, record it), then STOPS — bounded context, refreshed each unit; the caches carry across.
+This is the "memory is a cache" loop the persistent stores + render were built for.
+
+Live unit on LS20 (11 turns, $0.42, ONE action of 8 spent) validated the whole pivot. The agent
+used `arcg objects` (connected components) to isolate the moving piece and `jotter effects` to name
+the counter, and correctly found: "move right slides a 5-wide c+9 cursor block (not the avatar);
+colour-11 is a position tracker; the avatar is stationary" — seeing straight through the confound
+that flailed the one-shot agent ("ACTION3 x4 didn't move"). It even teed up the next unit's
+hypothesis then stopped. Tool freedom dissolved the perception bottleneck.
+
+Gap the run exposed + fixed: the agent recorded via `arcg note`, which is SESSION-scoped, so
+`l0.end()` wiped it. Durable memory must outlive the session — moved findings to `.arc/findings.md`
+(jotter's corpus was already durable; the action survived). Context-refresh now works across runs.
+
+Also built the `dagger` CLI (render/get/plan/decompose/init) so the reasoner can inspect and grow
+the plan graph. `reason` + `dagger` registered in [project.scripts]. Full suite 62.

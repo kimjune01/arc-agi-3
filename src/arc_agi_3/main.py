@@ -76,6 +76,10 @@ def main() -> None:
             for g in games:
                 verdict = agent.play(game_id=g["game_id"], card_id=card_id)
                 print(verdict)
+                # Observe the plan trace (the prompt-level decomposition suggestion at work).
+                for e in getattr(agent, "_trace", []):
+                    plan = (e["plan"] or "(none)").replace("\n", " ")
+                    print(f"  {e['step']:3} {e['action']:8} plan: {plan[:90]}")
         finally:
             summary = client.close_scorecard(card_id)
             print(f"\nscorecard closed. aggregate score: {summary.get('score')}")
