@@ -124,9 +124,11 @@ decision procedure and the node's reliability schema stay judged/deferred (§sof
 **Node** = the morphism. Fields: `post` (prose goal it makes true, its codomain), `pre` (prose
 applicability, its domain), and a body that is either a `leaf` (one primitive action token) or a
 `compound` (`children` + `mode ∈ {sequence, conjunction}`). `status` carries the write-once
-verdict (`open → live | killed`) and is OUTSIDE the identity key, so a kill never rewrites the
-ref. Identity is the content-address over the NORMALIZED-EXACT remaining fields, never a matcher
-call.
+verdict (`open → live | killed`). Identity is the authored ANCHOR (the write-once ref, like
+arbor's `#4`), NOT a hash of the prose and never a matcher call: near-synonyms don't fork the
+node, the reasoner keeps writing under one anchor. The store (a SQLite jotter submodule) is the
+source of truth and `render`s to markdown for inspection; prose is annotation, and nothing parses
+it back.
 
 | verb | contract | law |
 |------|----------|-----|

@@ -1,61 +1,73 @@
 """dagger Action DAG — sanity over the COMMITTED outer contracts only (DAGGER.md §interface).
 
-The deferred parts (the matcher's tolerance, the simmer commuting check in `decompose`) are
-deliberately NOT asserted: this pins the shape we committed, not the impl's unverified judgment.
+Backed by an in-memory jotter SQLite store. The deferred parts (matcher tolerance, the simmer
+commuting check) are deliberately NOT asserted: this pins the committed shape, not the impl's
+unverified judgment.
 """
 
-import dataclasses
+import pytest
 
 from arc_agi_3 import dagger as dg
+from arc_agi_3.jotter import db
+
+
+def _conn():
+    return db.connect(":memory:")
 
 
 def test_init_seeds_apex_and_one_leaf_per_action():
-    d = dg.init(["ACTION1", "ACTION2", "ACTION6"])
-    assert len(d.nodes) == 4                       # apex + 3 leaves, determined
-    assert any(n.post == dg.WIN for n in d.nodes.values())
-    leaves = [n for n in d.nodes.values() if n.is_leaf]
-    assert sorted(n.action for n in leaves) == ["ACTION1", "ACTION2", "ACTION6"]
+    c = _conn()
+    dg.init(c, ["ACTION1", "ACTION2", "ACTION6"])
+    rows = db.nodes(c)
+    assert len(rows) == 4                                  # apex + 3 leaves, determined
+    assert dg.get(c, "dagger:win-game").post == dg.WIN
+    leaves = [r for r in rows if r["kind"] == "leaf"]
+    assert sorted(r["action"] for r in leaves) == ["ACTION1", "ACTION2", "ACTION6"]
 
 
 def test_plan_misses_to_hole_then_hits_after_decompose():
-    d = dg.init(["ACTION1"])
-    assert isinstance(dg.plan(d, "win game"), dg.Hole)      # apex undecomposed -> JIT miss
-    dg.decompose(d, "win game", ["c1", "c2"], "sequence")
-    assert isinstance(dg.plan(d, "WIN  GAME"), dg.Node)     # normalized exact hit
+    c = _conn()
+    dg.init(c, ["ACTION1"])
+    assert isinstance(dg.plan(c, "win game"), dg.Hole)     # apex undecomposed -> JIT miss
+    dg.decompose(c, "win-recipe", "win game", ["ACTION1"], "sequence")
+    assert isinstance(dg.plan(c, "WIN  GAME"), dg.Node)    # normalized exact hit
 
 
 def test_put_idempotent_and_get_resolves_ref():
-    d = dg.init([])
-    n = dg.decompose(d, "open door", ["c1"], "sequence")
-    before = len(d.nodes)
-    assert dg.put(d, n).id == n.id and len(d.nodes) == before   # no new node
-    assert dg.get(d, n.ref()).id == n.id
-    assert dg.get(d, "dagger:nope") is None                     # MISS is data, not error
+    c = _conn()
+    n = dg.decompose(c, "open-door", "open door", ["ACTION1"], "sequence")
+    before = len(db.nodes(c))
+    assert dg.put(c, n).anchor == n.anchor and len(db.nodes(c)) == before   # no new node
+    assert dg.get(c, n.ref()).anchor == "open-door"
+    assert dg.get(c, "dagger:nope") is None                                 # MISS is data
 
 
-def test_identity_excludes_status_so_a_kill_keeps_the_ref():
-    a = dg.Node(post="open door", children=("c1",), mode="sequence")
-    killed = dataclasses.replace(a, status="killed")
-    assert a.id == killed.id                                    # status is outside the id key
+def test_status_ratchets_by_domination_never_downgrades():
+    c = _conn()
+    base = dg.Node(anchor="x", post="p", children=("ACTION1",), mode="sequence")  # open
+    dg.put(c, base)
+    dg.put(c, dg.Node(anchor="x", post="p", children=("ACTION1",), mode="sequence", status="killed"))
+    assert dg.get(c, "x").status == "killed"               # ratcheted up
+    dg.put(c, base)                                        # re-put open
+    assert dg.get(c, "x").status == "killed"               # never downgrades
 
 
-def test_distinct_prose_distinct_id_matcher_never_dedups():
-    # exact equality for identity: two goals the matcher MIGHT judge equal stay distinct here.
-    assert dg.Node(post="block adjacent to wall").id != dg.Node(post="block left-aligned").id
-
-
-def test_merge_commutative_and_idempotent_under_status_conflict():
-    base = dg.Node(post="open door", children=("c1",), mode="sequence")   # open
-    killed = dataclasses.replace(base, status="killed")
-    A, B = dg.Dag(), dg.Dag()
-    dg.put(A, base)
-    dg.put(B, killed)
-    ab, ba = dg.merge(A, B), dg.merge(B, A)
-    assert ab.nodes[base.id].status == "killed" == ba.nodes[base.id].status  # domination, both orders
-    assert set(dg.merge(ab, ab).nodes) == set(ab.nodes)                      # idempotent
+def test_merge_dominates_on_status():
+    a, b = _conn(), _conn()
+    node = dg.Node(anchor="x", post="p", children=("ACTION1",), mode="sequence")
+    dg.put(a, node)                                                            # open in a
+    dg.put(b, dg.Node(**{**node.__dict__, "status": "killed"}))                # killed in b
+    dg.merge(a, b)
+    assert dg.get(a, "x").status == "killed"               # killed wins the join
 
 
 def test_decompose_rejects_bad_mode():
-    import pytest
     with pytest.raises(ValueError):
-        dg.decompose(dg.Dag(), "g", ["c1"], "nonsense")
+        dg.decompose(_conn(), "a", "g", ["ACTION1"], "nonsense")
+
+
+def test_render_lists_the_graph():
+    c = _conn()
+    dg.init(c, ["ACTION1"])
+    md = dg.render(c)
+    assert md.startswith("# dagger graph") and "win-game" in md and "ACTION1" in md
