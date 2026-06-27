@@ -33,12 +33,18 @@ A game is ALREADY IN PROGRESS with a tight action budget: every act is costly, i
 You are a FRESH session with no memory of prior turns — the memory lives on disk, so re-hydrate first.
 
 Toolbox (all via `uv run <tool> ...`, run from the repo root):
-  arcg look | objects | diff            perceive (objects = connected components; isolates the avatar)
+  arcg objects | diff                   perceive COMPACTLY: `objects` lists the pieces, `diff` shows
+                                        just what changed after an action. These are almost always
+                                        enough.
+  arcg look                             the full 64x64 grid — AVOID it. Each dump bloats your context
+                                        and slows every later turn; repeating it is what makes a unit
+                                        time out. Use it at most ONCE, only if objects+diff truly can't
+                                        answer your question.
   arcg move <up|down|left|right> | interact | click <x> <y>   ACT (spends one budget unit each)
   arcg note "<finding>" | notes         your durable scratchpad across sessions
   jotter stats | effects | log | trace  read the grounded record (FREE). `effects` names the
                                         move-counter and other resource facts straight from history.
-  simmer ...                            predict an action's result for FREE before spending a real one
+  simmer predict <up|down|left|right>   FREE prediction of an action on the CURRENT grid (compact)
   dagger render | plan <goal> | decompose <anchor> <goal> <child>...   the PLAN graph (FREE). Record
                                         your decomposition of the goal into 2+ subgoals; reuse a
                                         subgoal's anchor instead of renaming it.
@@ -58,10 +64,11 @@ Do exactly ONE UNIT OF EXPERIMENT, then STOP. Do not try to win in one session.
   4. Record the finding durably (one line): `arcg note "<what you learned>"`. Then END YOUR TURN.
 
 Do NOT run `arcg start` or `arcg end` — the harness owns the game lifecycle. One hypothesis tested
-and recorded is a complete unit. Keep it small so the next session can refresh cleanly."""
+and recorded is a complete unit. You have ~16 tool calls — don't dawdle: re-hydrate, perceive ONCE,
+predict, act once or twice, record, stop. Keep it small so the next session can refresh cleanly."""
 
 
-def run_unit(*, model: str = "sonnet", max_turns: int = 40, timeout: float = 420.0) -> dict:
+def run_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300.0) -> dict:
     """Run ONE experiment unit as a fresh agentic claude session. Returns the parsed result dict
     (the session's `result` text plus its cost/turns). Context is fresh; the memory persists."""
     cmd = [
@@ -117,7 +124,7 @@ def main() -> None:
     load_dotenv()
     p = argparse.ArgumentParser(prog="reason", description="Drive a game as per-unit agentic sessions.")
     p.add_argument("game", help="game_id or substring")
-    p.add_argument("--units", type=int, default=5, help="experiment units (fresh sessions)")
+    p.add_argument("--units", type=int, default=1, help="experiment units (fresh sessions)")
     p.add_argument("--budget", type=int, default=20, help="action cap for the whole run")
     p.add_argument("--model", default="sonnet")
     args = p.parse_args()

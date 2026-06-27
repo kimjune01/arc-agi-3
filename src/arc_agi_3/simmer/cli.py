@@ -1,9 +1,11 @@
 """simmer CLI — differentially test the hand-edited engine against piper's corpus.
 
-`simmer test`  — replay every recorded transition through `step`; report which the
-                 engine reproduces and, for misses, WHERE it diverges (the refine signal).
-`simmer step`  — apply `step` to one corpus transition's before-state and show the
-                 predicted grid plus its diff against reality.
+`simmer test`     — replay every recorded transition through `step`; report which the
+                    engine reproduces and, for misses, WHERE it diverges (the refine signal).
+`simmer step`     — apply `step` to one corpus transition's before-state and show the
+                    predicted grid plus its diff against reality.
+`simmer predict`  — predict an action on the CURRENT live grid, free, before spending a real
+                    one (the loop's free rollout). Compact: prints only what changes.
 
 The corpus is `$ARCG_STATE_DIR/transitions.jsonl`, written by piper as you play.
 """
@@ -62,6 +64,29 @@ def step_cmd(path, index: int, no_grid: bool) -> str:
     return out
 
 
+_INTENT = {"up": "ACTION1", "down": "ACTION2", "left": "ACTION3", "right": "ACTION4"}
+
+
+def predict_cmd(action: str, x, y, show_grid: bool) -> str:
+    """Predict an action's result on the CURRENT live grid, for FREE, before spending a real one.
+    This is the loop's free rollout (simmer's deduction vs piper's paid inhale). Compact by default
+    — prints only what CHANGES, not the 64x64 grid (pass --grid to dump it)."""
+    from ..arcg import store
+    action = _INTENT.get(action.lower(), action)
+    sess = store.load_or_none()
+    if sess is None or not sess.grid:
+        raise SystemExit("simmer: no active game grid — run `arcg start <game>` first.")
+    before = np.asarray(sess.grid, np.int16)
+    pred = np.asarray(step(before, action, x, y), np.int16)
+    d = diff_grids(before, pred)
+    verdict = ("no change predicted (a wall, or simmer doesn't model this action)"
+               if d.changed == 0 else d.describe(max_cells=12))
+    out = f"simmer predict {action} (x={x}, y={y}) → {verdict}"
+    if show_grid:
+        out += "\npredicted grid:\n" + render_grid(pred)
+    return out
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="simmer", description="Functional sim engine — differential test vs piper.")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -73,6 +98,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--corpus", type=str, default=None)
     s.add_argument("--no-grid", action="store_true")
     s.set_defaults(fn=lambda a: step_cmd(_corpus(a), a.index, a.no_grid))
+    pr = sub.add_parser("predict", help="predict an action on the CURRENT grid (free; compact, no grid dump)")
+    pr.add_argument("action", help="up|down|left|right or ACTION1..7")
+    pr.add_argument("--x", type=int)
+    pr.add_argument("--y", type=int)
+    pr.add_argument("--grid", action="store_true", help="also dump the full predicted grid (big)")
+    pr.set_defaults(fn=lambda a: predict_cmd(a.action, a.x, a.y, a.grid))
     return p
 
 
