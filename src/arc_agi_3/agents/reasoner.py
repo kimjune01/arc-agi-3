@@ -23,11 +23,10 @@ from ..arcg import store
 PROJECT_ROOT = Path(__file__).resolve().parents[3]   # .../src/arc_agi_3/agents/ -> repo root
 _TERMINAL = ("WIN", "GAME_OVER")
 
-# The CLIs the agentic session may call (free inspection + the budget-bearing intent verbs), plus
-# read/append to the DURABLE findings file (survives the session, so context refreshes across runs).
+# The CLIs the agentic session may call (free inspection + the budget-bearing intent verbs).
+# `arcg note`/`notes` is now durable (survives the session), so it's the single memory of findings.
 _ALLOWED = ["Bash(uv run arcg:*)", "Bash(uv run jotter:*)",
-            "Bash(uv run simmer:*)", "Bash(uv run dagger:*)",
-            "Bash(cat .arc/findings.md:*)", "Bash(echo:*)"]
+            "Bash(uv run simmer:*)", "Bash(uv run dagger:*)"]
 
 UNIT_TASK = """You are the reasoner for an agent playing ARC-AGI-3, an unknown 64x64 grid game. \
 A game is ALREADY IN PROGRESS with a tight action budget: every act is costly, inspection is free. \
@@ -46,18 +45,17 @@ Toolbox (all via `uv run <tool> ...`, run from the repo root):
 
 GOAL: raise the score (levels_completed) toward state WIN.
 
-Your durable findings live in `.arc/findings.md` (survives this session; the session itself does
-NOT, so that file plus jotter's corpus IS your memory).
+Your memory is `arcg notes` (durable — it survives the session) plus jotter's corpus. The session
+itself does NOT survive, so re-read those first.
 
 Do exactly ONE UNIT OF EXPERIMENT, then STOP. Do not try to win in one session.
-  1. Re-hydrate: `cat .arc/findings.md`, `jotter stats`, `jotter effects`, `arcg look`, `arcg objects`.
+  1. Re-hydrate: `arcg notes`, `jotter stats`, `jotter effects`, `arcg look`, `arcg objects`.
   2. Form ONE specific question you're unsure of (e.g. "which object is the avatar? does ACTION3
-     move it left?") or pick the next subgoal toward WIN.
+     move it left?") or pick the next subgoal toward WIN. Don't re-derive what `arcg notes` already says.
   3. Test it with the FEWEST real actions. Predict with simmer first when it saves a move. Watch the
      delta / objects to read the result. The move-counter changes every action — discount it; look
      for what ELSE moved.
-  4. Record the finding durably (one line): `echo "<what you learned>" >> .arc/findings.md`. Then
-     END YOUR TURN.
+  4. Record the finding durably (one line): `arcg note "<what you learned>"`. Then END YOUR TURN.
 
 Do NOT run `arcg start` or `arcg end` — the harness owns the game lifecycle. One hypothesis tested
 and recorded is a complete unit. Keep it small so the next session can refresh cleanly."""
@@ -93,21 +91,21 @@ def run(game: str, *, units: int = 5, budget: int = 20, model: str = "sonnet") -
     game and stops early on WIN/GAME_OVER or budget exhaustion; each unit refreshes context."""
     l0.start(game, budget_cap=budget)
     units_log: list[dict] = []
-    try:
-        for i in range(units):
-            sess = store.load_or_none()
-            if sess and (sess.state in _TERMINAL
-                         or (sess.budget_cap is not None and sess.actions_spent >= sess.budget_cap)):
-                break
-            r = run_unit(model=model)
-            sess = store.load_or_none()
-            r["unit"] = i + 1
-            r["score"] = sess.score if sess else None
-            r["spent"] = sess.actions_spent if sess else None
-            r["state"] = sess.state if sess else None
-            units_log.append(r)
-    finally:
-        l0.end()
+    for i in range(units):
+        sess = store.load_or_none()
+        if sess and (sess.state in _TERMINAL
+                     or (sess.budget_cap is not None and sess.actions_spent >= sess.budget_cap)):
+            break
+        r = run_unit(model=model)
+        sess = store.load_or_none()
+        r["unit"] = i + 1
+        r["score"] = sess.score if sess else None
+        r["spent"] = sess.actions_spent if sess else None
+        r["state"] = sess.state if sess else None
+        units_log.append(r)
+    # Deliberately do NOT end()/clear the session — leave it open so the whole run stays
+    # inspectable afterward (arcg look | jotter | dagger render | .arc/findings.md). The next
+    # `arcg start` overwrites it; close manually with `arcg end` when done.
     return units_log
 
 
@@ -129,6 +127,11 @@ def main() -> None:
             head += f" | {r['turns']} turns ${r.get('cost_usd', 0):.3f}"
         print(head + " ---")
         print((r.get("result") or "").strip()[:600])
+
+    notes = PROJECT_ROOT / ".arc" / "notes.md"
+    if notes.exists():
+        print("\n=== durable notes (arcg notes) ===")
+        print(notes.read_text().strip())
 
 
 if __name__ == "__main__":
