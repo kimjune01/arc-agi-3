@@ -53,6 +53,10 @@ PASSABLE = frozenset({CORRIDOR, 0, 1, 5, 11})  # 11: witnessed run4 lvl2 — maz
 _DELTA = {"ACTION1": (-STEP, 0), "ACTION2": (STEP, 0),
           "ACTION3": (0, -STEP), "ACTION4": (0, STEP)}
 
+# The actions simmer actually MODELS. step() returns identity for anything else, so a caller
+# must distinguish "modeled no-op (a wall)" from "no model (uncharted — worth a real probe)".
+MODELED = frozenset(_DELTA)
+
 
 def _unit_mask(grid: np.ndarray) -> np.ndarray:
     """The avatar (12) cells plus the 9-tail 4-connected to them (the moving unit)."""

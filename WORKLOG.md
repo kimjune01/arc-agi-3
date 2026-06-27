@@ -690,3 +690,65 @@ Live low-budget run (LS20, budget cap 6, 5 moves):
 - `jotter audit`: gapless stamps 1..5, piper actions_spent 5 == jotter 5 (faithful, no drops).
 - gates held live: every `arcg move` routed through dagger-gate + arbor-gate and passed.
 Score 0 (5 unguided moves). The gate contract layer survived a real API run.
+
+## 2026-06-27 — dagger backed by a SQLite jotter submodule (db is truth, render for inspection)
+
+Design call (resolving "where does the dagger data structure live?"): it's a prose md file until
+it outgrows context, then a lightweight db — PLAN.md's own ratchet. But the render insight flipped
+it: a `render()` projects the db OUT to prose for inspection, so you get in-context legibility AND
+never write a brittle prose parser (truth flows db→prose, one direction). That kills the md-file
+stage's only advantage, so we skipped straight to the db. Held against codex's prod-scale push:
+SQLite (stdlib, single file), NOT an event store — single-agent serial, correctness over wall-clock.
+
+Two decisions locked:
+- **node identity = authored ANCHOR** (write-once, like arbor's #4), not a hash of the prose.
+  Dodges codex's near-synonym proliferation; the matcher stays on the predicate, the anchor is
+  identity.
+- **belief stays deferred.** The schema is evidence/skeleton only (nodes); verdicts/credence wait
+  for the first verdict, when PK-idempotent set-add and belief-as-query both start paying.
+
+Built:
+- `jotter/db.py`: nodes table keyed by anchor (PK). `put` = `INSERT ... ON CONFLICT DO UPDATE
+  WHERE rank(new) > rank(old)`, so status domination (killed > live > open) + idempotency are
+  STRUCTURAL (PK-enforced), not policed. `render(conn)` -> markdown. db.py is dagger-agnostic
+  (knows the table, not the matcher), staying below dagger in the import order.
+- `dagger/dag.py`: verbs (init/get/plan/decompose/put/merge/live/render) re-pointed at the store;
+  Node identified by anchor; `connect()` -> STATE_DIR/graph.db, ':memory:' for tests.
+- tests rewritten for the sqlite model; DAGGER.md §interface doc-synced (anchor identity, db→prose).
+Full suite 60. Verified: render lists leaves + a killed compound + apex; get/live resolves the
+killed node to live=False — the reader the dagger-gate liveness TODO was waiting on. Commit 475f65e.
+
+Open forks: (1) wire dagger-gate to call dagger.live (reader now exists; needs a conn on the act
+path). (2) the first verdict, which lights up the belief tables. Codex's standing corrections still
+parked: closure-warrant for surprises, kill-the-justification (ATMS granularity), first-divergence
+is a candidate not the culprit, matcher must not authorize a paid action.
+
+## 2026-06-27 — the serial loop (driver): gated, simmer-reconciled, frontier-exploring
+
+Built the synchronous loop (PLAN.md §the-serial-loop) as `driver/` — importable `run`/`decide` with
+a thin `drive` CLI over the same surface (the tools are both CLI and Python, per the convention).
+The loop: perceive → simmer.step predicts free → act through the GATED path (l0.act → dagger/arbor
+pregates → jotter record → postgate reconcile piper⊕simmer) → decide. Seeds the dagger graph
+(init with the game's available_actions) so the dagger refs resolve to real leaves. Cognitive steps
+(arbor abduce/witness, dagger.decompose) deferred — the loop explores, it doesn't yet form beliefs.
+
+Live drives on LS20 drove the policy fixes (the value of a real run):
+- **simmer is accurate on LS20 movement.** 0 surprises, and I ground-truthed it: simmer.step matches
+  the recorded reality 20/20. The hand-written slide+deplete model captures LS20's moves+counter, so
+  the 0 is real, not a postgate bug. (It hasn't been tested on the lock mechanic — exploration never
+  reached it.)
+- **decide bug 1 — counter confound.** Every action depletes the move-counter (a grid change), so
+  "prefer a simmer-predicted move" thought every action moved. Fixed: detect movement on the
+  COUNTER-MASKED state (jotter's hash), not the raw grid.
+- **decide bug 2 — oscillation.** Greedy-local novelty round-robins (up then down undoes itself),
+  exhausting the neighborhood then cycling (3 unique states / 20 actions). Fixed: frontier-seeking —
+  try UNTRIED actions from the current state first, and when it's fully expanded, BFS the known
+  masked-state graph to the nearest state that still has an untried action and head that way. Result
+  3→9 unique states, 4→23 edges in 25 actions.
+- simmer now declares coverage (`MODELED`); `_predict` returns None for unmodeled actions so decide
+  PROBES them rather than skipping them as walls (PLAN's "spend where simmer lacks coverage"). Moot
+  on LS20 (only ACTION1-4 offered) but correct for games with interact/click.
+
+Score still 0 — exploration isn't goal-directed (no dagger.plan decomposition, no key/lock model).
+That's the next layer: a plan toward the lock + the win-trigger, which is the cognitive step. Full
+suite 62. `drive` registered in [project.scripts].
