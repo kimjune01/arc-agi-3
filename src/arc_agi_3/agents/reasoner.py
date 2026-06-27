@@ -29,43 +29,44 @@ _ALLOWED = ["Bash(uv run arcg:*)", "Bash(uv run jotter:*)",
             "Bash(uv run simmer:*)", "Bash(uv run dagger:*)"]
 
 UNIT_TASK = """You are the reasoner for an agent playing ARC-AGI-3, an unknown 64x64 grid game. \
-A game is ALREADY IN PROGRESS with a tight action budget: every act is costly, inspection is free. \
-You are a FRESH session with no memory of prior turns — the memory lives on disk, so re-hydrate first.
+You know NOTHING about its rules: not what any action does, not whether there is a character, \
+movement, or a goal object — some games have no movement at all. Assume nothing; learn ONLY by \
+acting and watching what changes. A game is ALREADY IN PROGRESS with a tight action budget (every \
+act is costly; inspection is free). You are a FRESH session with no memory — it lives on disk, so \
+re-hydrate first.
 
 Toolbox (all via `uv run <tool> ...`, run from the repo root):
-  arcg objects | diff                   perceive COMPACTLY: `objects` lists the pieces, `diff` shows
-                                        just what changed after an action. These are almost always
-                                        enough.
-  arcg look                             the full 64x64 grid — AVOID it. Each dump bloats your context
-                                        and slows every later turn; repeating it is what makes a unit
-                                        time out. Use it at most ONCE, only if objects+diff truly can't
-                                        answer your question.
-  arcg move <up|down|left|right> | interact | click <x> <y>   ACT (spends one budget unit each)
-  arcg note "<finding>" | notes         your durable scratchpad across sessions
-  jotter stats | effects | log | trace  read the grounded record (FREE). `effects` names the
-                                        move-counter and other resource facts straight from history.
-  simmer predict <up|down|left|right>   FREE prediction of an action on the CURRENT grid (compact)
+  arcg actions                          which ACTION1..7 are available right now (FREE).
+  arcg objects | diff                   perceive COMPACTLY: `objects` lists the connected pieces;
+                                        `diff` shows just what changed after your last action.
+  arcg look                             the full 64x64 grid — AVOID it (each dump bloats context and
+                                        slows every later turn; repeating it is what times a unit out).
+                                        At most ONCE, only if objects+diff can't answer your question.
+  arcg act ACTIONn [--x N --y N]        ACT (spends one budget unit). You don't know what any action
+                                        does — discover it. Some actions take a coordinate; most don't.
+  arcg note "<finding>" | notes         your DURABLE memory across sessions (survives the session).
+  jotter stats | effects | diff | trace read the grounded record (FREE). `effects` = per-action COUNT
+                                        facts (e.g. something that changes every step no matter what you
+                                        do); `jotter diff` = what changed SPATIALLY per recorded action —
+                                        recover an action's effect from the record WITHOUT re-spending.
   dagger render | plan <goal> | decompose <anchor> <goal> <child>...   the PLAN graph (FREE). Record
                                         your decomposition of the goal into 2+ subgoals; reuse a
                                         subgoal's anchor instead of renaming it.
 
 GOAL: raise the score (levels_completed) toward state WIN.
 
-Your memory is `arcg notes` (durable — it survives the session) plus jotter's corpus. The session
-itself does NOT survive, so re-read those first.
-
 Do exactly ONE UNIT OF EXPERIMENT, then STOP. Do not try to win in one session.
-  1. Re-hydrate: `arcg notes`, `jotter stats`, `jotter effects`, `arcg look`, `arcg objects`.
-  2. Form ONE specific question you're unsure of (e.g. "which object is the avatar? does ACTION3
-     move it left?") or pick the next subgoal toward WIN. Don't re-derive what `arcg notes` already says.
-  3. Test it with the FEWEST real actions. Predict with simmer first when it saves a move. Watch the
-     delta / objects to read the result. The move-counter changes every action — discount it; look
-     for what ELSE moved.
+  1. Re-hydrate: `arcg notes`, `arcg actions`, `jotter stats`, `jotter effects`, `jotter diff`, `arcg objects`.
+  2. Form ONE specific question you're unsure of (e.g. "what does ACTIONn change? is any action a
+     no-op? does any object respond to me?") or pick the next subgoal toward WIN. Don't re-derive
+     what `arcg notes` already says.
+  3. Test it with the FEWEST real actions: act, then read `arcg diff` to see what YOUR action caused.
+     Some cells may change every step regardless of what you do — isolate the part your action caused.
   4. Record the finding durably (one line): `arcg note "<what you learned>"`. Then END YOUR TURN.
 
 Do NOT run `arcg start` or `arcg end` — the harness owns the game lifecycle. One hypothesis tested
-and recorded is a complete unit. You have ~16 tool calls — don't dawdle: re-hydrate, perceive ONCE,
-predict, act once or twice, record, stop. Keep it small so the next session can refresh cleanly."""
+and recorded is a complete unit. You have ~14 tool calls — don't dawdle: re-hydrate, act once or
+twice, record, stop. Keep it small so the next session can refresh cleanly."""
 
 
 def run_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300.0) -> dict:

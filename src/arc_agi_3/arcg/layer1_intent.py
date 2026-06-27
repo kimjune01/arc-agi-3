@@ -77,6 +77,14 @@ def look(*, no_grid: bool = False) -> str:
     return _observe(store.load(), include_grid=not no_grid)
 
 
+def available() -> str:
+    """The actions the game currently offers — the action SPACE. (You still don't know what any of
+    them does; that's learned by acting.) Free: reads the session, no API call."""
+    sess = store.load()
+    acts = sess.available_actions or []
+    return "available actions: " + (", ".join(acts) if acts else "(none reported)")
+
+
 def diff() -> str:
     sess = store.load()
     if not (sess.prev_grid and len(sess.prev_grid) == len(sess.grid)):

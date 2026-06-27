@@ -23,7 +23,7 @@ from . import trace
 # files once the five modules are split into separate processes).
 _LAYER = {
     "games": 0, "start": 0, "act": 0, "reset": 0, "end": 0,
-    "move": 1, "interact": 1, "click": 1, "undo": 1, "look": 1, "diff": 1, "objects": 1,
+    "move": 1, "interact": 1, "click": 1, "undo": 1, "look": 1, "diff": 1, "objects": 1, "actions": 1,
     "history": 2, "snapshot": 2, "restore": 2, "peek": 2,
     "note": 3, "notes": 3,
 }
@@ -68,6 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
     add("click", lambda a: l1.click(a.x, a.y), "click/place at x,y (ACTION6)",
         [("x", {"type": int}), ("y", {"type": int})])
     add("undo", lambda a: l1.undo(), "undo last action (ACTION7)")
+    add("actions", lambda a: l1.available(), "list the currently available actions")
     add("look", lambda a: l1.look(no_grid=a.no_grid), "render current observation",
         [("--no-grid", {"action": "store_true"})])
     add("diff", lambda a: l1.diff(), "delta since last action")

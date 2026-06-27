@@ -174,6 +174,22 @@ def trace(rows: list) -> dict:
     return {"id": tid, **core, "len": len(steps)}
 
 
+def transition_diff(before, after):
+    """The SPATIAL delta of one recorded transition, via piper's perception (`diff_grids`) — WHAT
+    changed and where, not how many. Returns a perception Delta (`.changed`, `.describe()`)."""
+    from ..perception import diff_grids
+    return diff_grids(np.asarray(before, np.int16), np.asarray(after, np.int16))
+
+
+def diffs(rows: list) -> list:
+    """Per-transition spatial deltas over the whole trace: the position story, the spatial twin of
+    `effects` (the count story). Movement is count-conserved, so it shows HERE but is invisible to
+    `effects` — this is how the agent recovers an action's effect from the trace instead of
+    re-spending budget to rediscover it. Returns [(i, action, x, y, Delta), ...]."""
+    return [(i, t["action"], t.get("x"), t.get("y"), transition_diff(t["before"], t["after"]))
+            for i, t in enumerate(rows)]
+
+
 def effects(rows: list) -> dict:
     """Grounded per-action effects, straight from the recorded transitions: for each action, the
     distribution of per-colour cell-count deltas (after − before). This answers the **resource /
