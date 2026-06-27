@@ -11,7 +11,7 @@ from __future__ import annotations
 from ..client import ArcClient
 from ..session import Session
 from ..structs import Action, FrameData, GameAction
-from . import store
+from . import gates, store
 
 
 class BudgetExceeded(RuntimeError):
@@ -76,8 +76,18 @@ def start(game: str, *, tags: str | None = None, budget_cap: int | None = None) 
 
 
 def act(token: str, *, x: int | None = None, y: int | None = None,
-        reasoning: str = "") -> FrameData:
-    """Raw ACTION1..7 (escape hatch). Returns the new FrameData. Meters budget."""
+        reasoning: str = "", dagger: str | None = None, arbor: str | None = None,
+        pred: list | None = None) -> FrameData:
+    """Raw ACTION1..7 (escape hatch). Returns the new FrameData. Meters budget.
+
+    The commit boundary: pregates fire here PRE-API (zero budget — a bounce never
+    reaches the game); the postgate fires after the real frame lands. `dagger`/`arbor`
+    are the dual-provenance refs (plan node / hypothesis) the action names; `pred` is the
+    simmer prediction the postgate reconciles against (None = no plan, postgate skipped).
+    """
+    # --- PREGATES (pre-API, zero budget) -- run before any I/O or budget spend. -------
+    gates.dagger_gate(dagger)
+    gates.arbor_gate(arbor)
     sess = store.load()
     try:
         kind = GameAction[token.upper()]
@@ -96,6 +106,11 @@ def act(token: str, *, x: int | None = None, y: int | None = None,
     if sess.prev_grid and len(sess.prev_grid) == len(sess.grid):
         store.append_transition(sess.game_id, sess.prev_grid, kind.name, x, y,
                                 sess.grid, sess.score, sess.actions_spent)
+    # --- POSTGATE (post-act) -- only when a simmer prediction exists to reconcile. -----
+    if pred is not None:
+        verdict = gates.postgate(pred, sess.grid)
+        # TODO: feed a kill -> arbor.from_kill, witness -> arbor.witness once arbor exists.
+        frame.raw["postgate"] = verdict
     return frame
 
 

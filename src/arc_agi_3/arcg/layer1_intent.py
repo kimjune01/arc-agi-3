@@ -42,25 +42,33 @@ def _observe(sess: Session, *, include_grid: bool = True) -> str:
 
 
 # --- intent (act, then perceive) -----------------------------------------
+# These convenience verbs name PLACEHOLDER provenance refs: the intent->action map is a
+# default guess (`dagger:intent:<verb>`) and an undirected probe of an open hypothesis
+# (`arbor:#probe`). The cognitive driver (the unbuilt synchronous loop) passes real refs
+# naming the live plan node and hypothesis it tests. TODO: thread real refs from there.
 def move(direction: str) -> str:
     if direction not in INTENT:
         raise SystemExit(f"direction must be one of {list(INTENT)}")
-    layer0_protocol.act(INTENT[direction], reasoning=f"move {direction}")
+    layer0_protocol.act(INTENT[direction], reasoning=f"move {direction}",
+                        dagger=f"dagger:intent:{direction}", arbor="arbor:#probe")
     return _observe(store.load())
 
 
 def interact() -> str:
-    layer0_protocol.act("ACTION5", reasoning="interact")
+    layer0_protocol.act("ACTION5", reasoning="interact",
+                        dagger="dagger:intent:interact", arbor="arbor:#probe")
     return _observe(store.load())
 
 
 def click(x: int, y: int) -> str:
-    layer0_protocol.act("ACTION6", x=x, y=y, reasoning=f"click {x},{y}")
+    layer0_protocol.act("ACTION6", x=x, y=y, reasoning=f"click {x},{y}",
+                        dagger="dagger:intent:click", arbor="arbor:#probe")
     return _observe(store.load())
 
 
 def undo() -> str:
-    layer0_protocol.act("ACTION7", reasoning="undo")
+    layer0_protocol.act("ACTION7", reasoning="undo",
+                        dagger="dagger:intent:undo", arbor="arbor:#probe")
     return _observe(store.load())
 
 

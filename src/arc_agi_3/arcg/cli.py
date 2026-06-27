@@ -46,9 +46,16 @@ def build_parser() -> argparse.ArgumentParser:
         "open scorecard, reset, show frame",
         [("game", {}), ("--tags", {}), ("--budget", {"type": int,
          "help": "tight action cap for test runs (~5x human); terminate when hit"})])
-    add("act", lambda a: _fmt(l0.act(a.action, x=a.x, y=a.y)),
+    add("act", lambda a: _fmt(l0.act(a.action, x=a.x, y=a.y,
+                                     dagger=a.dagger, arbor=a.arbor)),
         "raw ACTION1..7 (escape hatch)",
-        [("action", {}), ("--x", {"type": int}), ("--y", {"type": int})])
+        [("action", {}), ("--x", {"type": int}), ("--y", {"type": int}),
+         # The escape hatch still names its provenance: a manual op defaults to the
+         # manual plan node + an open manual hypothesis. The driver passes real refs.
+         ("--dagger", {"default": "dagger:manual",
+          "help": "plan-node ref this action executes (dagger:<id>)"}),
+         ("--arbor", {"default": "arbor:#manual",
+          "help": "hypothesis ref this action tests (arbor:#<id>)"})])
     add("reset", lambda a: _fmt(l0.reset(full=not a.level)),
         "RESET (full by default; --level restarts current level)",
         [("--level", {"action": "store_true"})])

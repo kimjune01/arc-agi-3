@@ -52,12 +52,14 @@ def peek(label: str) -> str:
 
 
 def _replay(token: str) -> None:
+    # Replay names the replay node + a replay hypothesis (it re-asserts a known path).
+    refs = dict(dagger="dagger:replay", arbor="arbor:#replay")
     if ":" in token:  # ACTION6:x,y
         name, coords = token.split(":", 1)
         x, y = (int(v) for v in coords.split(","))
-        layer0_protocol.act(name, x=x, y=y, reasoning="replay")
+        layer0_protocol.act(name, x=x, y=y, reasoning="replay", **refs)
     else:
-        layer0_protocol.act(token, reasoning="replay")
+        layer0_protocol.act(token, reasoning="replay", **refs)
 
 
 def restore(label: str) -> str:
