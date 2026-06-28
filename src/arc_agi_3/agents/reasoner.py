@@ -29,10 +29,16 @@ _TERMINAL = ("WIN", "GAME_OVER")
 # one is how learning compounds across runs (and how it transfers to another agent/machine).
 MEMORY_FILES = ("notes.md", "transitions.jsonl", "graph.db")
 
-# The CLIs the agentic session may call (free inspection + the budget-bearing intent verbs).
-# `arcg note`/`notes` is now durable (survives the session), so it's the single memory of findings.
-_ALLOWED = ["Bash(uv run arcg:*)", "Bash(uv run jotter:*)",
-            "Bash(uv run simmer:*)", "Bash(uv run dagger:*)"]
+# The tool allowlists ENFORCE the read/write split between the two passes (not just the prompt):
+#   FORWARD (wake/explore) acts the game and writes jotter + notes; it only READS dagger (the plan
+#     the sleep pass built) — render/plan/get, never decompose.
+#   BACKWARD (sleep/consolidate) reads everything and WRITES dagger (decompose); it never plays
+#     (no `arcg act` — only `arcg note`/`notes`).
+_FORWARD_ALLOWED = ["Bash(uv run arcg:*)", "Bash(uv run jotter:*)",
+                    "Bash(uv run dagger render:*)", "Bash(uv run dagger plan:*)",
+                    "Bash(uv run dagger get:*)"]
+_BACKWARD_ALLOWED = ["Bash(uv run arcg note:*)", "Bash(uv run arcg forget:*)",
+                     "Bash(uv run jotter:*)", "Bash(uv run dagger:*)"]
 
 
 def _restore_checkpoint(src: Path) -> int:
@@ -56,11 +62,12 @@ def _save_checkpoint(dst: Path) -> None:
         if p.exists():
             shutil.copy2(p, dst / f)
 
-UNIT_TASK = """You are a reasoner studying ARC-AGI-3, an unknown 64x64 grid game. YOUR GOAL IS TO \
-LEARN IT AND LEAVE DURABLE, REUSABLE MEMORY — not to play it or win it. The product of your turn is \
-a recorded finding the next session inherits, NOT a higher score. Score moving is a SIGNAL to learn \
-from ("what did I do that changed it?"), and winning is a SIDE EFFECT of understanding the game \
-well enough; neither is the objective. Spend each action to MAXIMIZE WHAT YOU LEARN per action.
+FORWARD_TASK = """You are the FORWARD (waking) pass of an agent studying ARC-AGI-3, an unknown \
+64x64 grid game. You EXPLORE and RECORD; a separate sleep pass later turns your records into \
+reusable structure. YOUR GOAL IS TO LEARN AND LEAVE DURABLE MEMORY — not to play or win. The \
+product of your turn is a recorded finding the next session inherits, NOT a higher score. Score \
+moving is a SIGNAL to learn from ("what did I do that changed it?"), and winning is a SIDE EFFECT \
+of understanding the game well enough; neither is the objective. Maximize WHAT YOU LEARN per action.
 
 You know NOTHING about the rules: not what any action does, not whether there is a character, \
 movement, or a goal object — some games have no movement at all. Assume nothing; learn ONLY by \
@@ -82,9 +89,9 @@ Toolbox (all via `uv run <tool> ...`, run from the repo root):
                                         facts (e.g. something that changes every step no matter what you
                                         do); `jotter diff` = what changed SPATIALLY per recorded action —
                                         recover an action's effect from the record WITHOUT re-spending.
-  dagger render | plan <goal> | decompose <anchor> <goal> <child>...   the PLAN graph (FREE). Record
-                                        your decomposition of the goal into 2+ subgoals; reuse a
-                                        subgoal's anchor instead of renaming it.
+  dagger render | plan <goal>           READ the plan graph the sleep pass built (FREE). Use it to
+                                        avoid re-deriving what's already structured. You only READ
+                                        it — writing the graph is the sleep pass's job, not yours.
 
 Do exactly ONE UNIT OF EXPERIMENT, then STOP. The unit succeeds if it leaves a new durable finding,
 whether or not the score moved.
@@ -102,21 +109,45 @@ and recorded is a complete unit. You have ~14 tool calls — don't dawdle: re-hy
 twice, record, stop. Keep it small so the next session can refresh cleanly."""
 
 
-def run_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300.0) -> dict:
-    """Run ONE experiment unit as a fresh agentic claude session. Returns the parsed result dict
-    (the session's `result` text plus its cost/turns). Context is fresh; the memory persists."""
-    cmd = [
-        "claude", "-p", UNIT_TASK,
-        "--output-format", "json",
-        "--model", model,
-        "--max-turns", str(max_turns),
-        "--allowedTools", *_ALLOWED,
-    ]
+CONSOLIDATE_TASK = """You are the BACKWARD (sleep) pass of an agent learning ARC-AGI-3. You do NOT
+play and spend NO actions. Your job: turn what the waking pass learned into reusable STRUCTURE in
+the plan graph, and REMEDIATE the memory — so the next waking pass inherits procedures, not an
+ever-growing pile of prose.
+
+Read the accumulated memory (all FREE):
+  arcg notes                       the waking pass's prose findings (the compressible scratchpad)
+  jotter trace | diff | effects    the grounded, PERMANENT record of what actually happened
+  dagger render                    the plan graph so far (what's already consolidated)
+
+Then, in order, then STOP:
+  1. CONSOLIDATE a well-grounded, RECURRING pattern as a POSITIVE node — a reliable action effect,
+     a sub-procedure that worked, a goal decomposition the evidence supports:
+       uv run dagger decompose <anchor> "<goal predicate>" <child-anchor>... --mode sequence|conjunction
+     Children are action leaves (ACTION1..7) or other subgoal anchors. REUSE an existing anchor, do
+     not mint a synonym. Only consolidate what the trace SUPPORTS; skip one-off guesses and anything
+     `dagger render` already has (idempotent — present? do nothing).
+  2. ENCODE a falsified plan as a NEGATIVE node (a nogood) so the next pass AVOIDS the dead end
+     instead of re-discovering it: `uv run dagger decompose <anchor> "<goal that FAILED>" <child>... --status killed`.
+     Do NOT merely forget a falsification — a forgotten dead end gets re-explored and re-wastes budget.
+     Encode the negative FIRST.
+  3. REMEDIATE the notes: a finding now captured in the graph (positive OR negative) is redundant
+     prose — prune it so the next pass re-hydrates clean: `uv run arcg forget "<key phrase>"`. NEVER
+     touch jotter — the trace is permanent ground truth; only the prose notes are prunable.
+  4. Record one line: `uv run arcg note "CONSOLIDATED <node>; KILLED <node>; pruned <what>"`.
+
+Additive on the graph (positive AND negative), lossy only on the prose. If nothing is well-grounded
+enough to consolidate yet, that is fine — say so and STOP. You have ~14 tool calls."""
+
+
+def _run_session(task: str, allowed: list, *, model: str, max_turns: int, timeout: float) -> dict:
+    """Run one fresh agentic claude session with a given task + tool allowlist. Context is fresh each
+    call; the durable memory on disk persists. Returns the parsed result (text + cost/turns)."""
+    cmd = ["claude", "-p", task, "--output-format", "json", "--model", model,
+           "--max-turns", str(max_turns), "--allowedTools", *allowed]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=timeout, cwd=PROJECT_ROOT)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=PROJECT_ROOT)
     except subprocess.TimeoutExpired:
-        return {"ok": False, "result": f"(unit timed out after {timeout}s)"}
+        return {"ok": False, "result": f"(session timed out after {timeout}s)"}
     if proc.returncode != 0:
         return {"ok": False, "result": f"claude exited {proc.returncode}: {proc.stderr[:300]}"}
     try:
@@ -127,37 +158,49 @@ def run_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300
             "turns": data.get("num_turns"), "cost_usd": data.get("total_cost_usd")}
 
 
-def run(game: str, *, units: int = 5, budget: int = 20, model: str = "sonnet",
+def run_forward_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300.0) -> dict:
+    """One WAKE pass: explore, act, record to jotter+notes; only READ the plan graph."""
+    return _run_session(FORWARD_TASK, _FORWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
+
+
+def run_backward_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300.0) -> dict:
+    """One SLEEP pass: consolidate grounded patterns into the DAG and remediate the notes. No play."""
+    return _run_session(CONSOLIDATE_TASK, _BACKWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
+
+
+def run(game: str, *, units: int = 3, cycles: int = 1, budget: int = 20, model: str = "sonnet",
         checkpoint: str | None = None) -> list[dict]:
-    """Drive `game` as a sequence of fresh per-unit agentic sessions. Each unit refreshes context;
-    the durable memory accumulates. If `checkpoint` is given, RESUME from that memory snapshot and
-    write the grown memory back to it at the end — so learning compounds across runs."""
+    """Drive `game` as alternating WAKE/SLEEP cycles, run sequentially. Each cycle: `units` forward
+    (explore) sessions that fill jotter+notes, then ONE backward (consolidate) session that writes
+    the DAG and remediates the notes. If `checkpoint` is given, RESUME from it and write the grown
+    memory back — so learning (incl. the DAG) compounds across runs."""
     cp = Path(checkpoint) if checkpoint else None
     if cp is not None and cp.exists():
         n = _restore_checkpoint(cp)
         print(f"(resumed {n} memory file(s) from checkpoint {cp})")
     l0.start(game, budget_cap=budget)
-    units_log: list[dict] = []
+    log: list[dict] = []
     try:
-        for i in range(units):
-            sess = store.load_or_none()
-            if sess and (sess.state in _TERMINAL
-                         or (sess.budget_cap is not None and sess.actions_spent >= sess.budget_cap)):
-                break
-            r = run_unit(model=model)
-            sess = store.load_or_none()
-            r["unit"] = i + 1
-            r["score"] = sess.score if sess else None
-            r["spent"] = sess.actions_spent if sess else None
-            r["state"] = sess.state if sess else None
-            units_log.append(r)
+        for c in range(cycles):
+            for i in range(units):                       # WAKE: forward exploration
+                sess = store.load_or_none()
+                if sess and (sess.state in _TERMINAL
+                             or (sess.budget_cap is not None and sess.actions_spent >= sess.budget_cap)):
+                    break
+                r = run_forward_unit(model=model)
+                sess = store.load_or_none()
+                r.update(phase="forward", cycle=c + 1,
+                         score=sess.score if sess else None,
+                         spent=sess.actions_spent if sess else None,
+                         state=sess.state if sess else None)
+                log.append(r)
+            cr = run_backward_unit(model=model)             # SLEEP: consolidate + remediate
+            cr.update(phase="consolidate", cycle=c + 1)
+            log.append(cr)
     finally:
-        if cp is not None:                       # the run's output IS the durable memory
+        if cp is not None:                       # the run's output IS the durable memory (incl. the DAG)
             _save_checkpoint(cp)
-    # Deliberately do NOT end()/clear the session — leave it open so the whole run stays
-    # inspectable afterward (arcg look | jotter | dagger render | .arc/findings.md). The next
-    # `arcg start` overwrites it; close manually with `arcg end` when done.
-    return units_log
+    return log
 
 
 def main() -> None:
@@ -166,17 +209,21 @@ def main() -> None:
     from dotenv import load_dotenv
 
     load_dotenv()
-    p = argparse.ArgumentParser(prog="reason", description="Drive a game as per-unit agentic sessions.")
+    p = argparse.ArgumentParser(prog="reason", description="Drive a game as alternating wake/sleep cycles.")
     p.add_argument("game", help="game_id or substring")
-    p.add_argument("--units", type=int, default=1, help="experiment units (fresh sessions)")
+    p.add_argument("--units", type=int, default=3, help="forward (explore) sessions per cycle")
+    p.add_argument("--cycles", type=int, default=1, help="wake/sleep cycles (each = units forward + 1 consolidate)")
     p.add_argument("--budget", type=int, default=20, help="action cap for the whole run")
     p.add_argument("--model", default="sonnet")
     p.add_argument("--checkpoint", default=None,
                    help="memory dir to RESUME from and write the grown memory back to (learning compounds)")
     args = p.parse_args()
-    for r in run(args.game, units=args.units, budget=args.budget, model=args.model,
-                 checkpoint=args.checkpoint):
-        head = f"--- unit {r['unit']} | score {r['score']} | spent {r['spent']} | {r['state']}"
+    for r in run(args.game, units=args.units, cycles=args.cycles, budget=args.budget,
+                 model=args.model, checkpoint=args.checkpoint):
+        if r.get("phase") == "consolidate":
+            head = f"--- cycle {r['cycle']} SLEEP/consolidate"
+        else:
+            head = f"--- cycle {r['cycle']} wake | score {r['score']} | spent {r['spent']} | {r['state']}"
         if r.get("turns"):
             head += f" | {r['turns']} turns ${r.get('cost_usd', 0):.3f}"
         print(head + " ---")
@@ -184,8 +231,11 @@ def main() -> None:
 
     notes = PROJECT_ROOT / ".arc" / "notes.md"
     if notes.exists():
-        print("\n=== durable notes (arcg notes) ===")
-        print(notes.read_text().strip())
+        print("\n=== durable notes (after remediation) ===")
+        print(notes.read_text().strip() or "(empty)")
+    from .. import dagger
+    print("\n=== plan graph (what the sleep pass consolidated) ===")
+    print(dagger.render(dagger.connect()))
 
 
 if __name__ == "__main__":

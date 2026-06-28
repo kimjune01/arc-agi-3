@@ -25,7 +25,7 @@ _LAYER = {
     "games": 0, "start": 0, "act": 0, "reset": 0, "end": 0,
     "move": 1, "interact": 1, "click": 1, "undo": 1, "look": 1, "diff": 1, "objects": 1, "actions": 1,
     "history": 2, "snapshot": 2, "restore": 2, "peek": 2,
-    "note": 3, "notes": 3,
+    "note": 3, "notes": 3, "forget": 3,
 }
 
 
@@ -92,6 +92,9 @@ def build_parser() -> argparse.ArgumentParser:
     # Layer 3 — memory
     add("note", lambda a: l3.note(a.text), "append a finding", [("text", {})])
     add("notes", lambda a: l3.notes(), "list findings")
+    add("forget", lambda a: l3.forget(a.match, all_=a.all),
+        "prune notes already compressed to structure, or falsified (consolidation cleanup)",
+        [("match", {"nargs": "?", "default": None}), ("--all", {"action": "store_true"})])
     return p
 
 

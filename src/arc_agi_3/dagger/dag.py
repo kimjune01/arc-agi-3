@@ -114,16 +114,15 @@ def plan(conn, goal: str):
     return Hole(goal=goal)
 
 
-def decompose(conn, anchor: str, goal: str, children, mode: str) -> Node:
+def decompose(conn, anchor: str, goal: str, children, mode: str, status: str = "open") -> Node:
     """Write a decomposition of `goal` into `children` (child anchors) under `mode`, identified by
-    the authored `anchor`. The commuting check `compose(children) ⊨ goal` is meant to be TESTED in
-    simmer (§soft-typing) — NOT wired here, so this writes UNVERIFIED with status `open`. A
-    malformed mode is a process-invariant bounce."""
+    the authored `anchor`. `status` defaults to `open`; pass `killed` to encode a NEGATIVE — a plan
+    the trace disproved (a nogood), so a future pass reads it and avoids the dead end instead of
+    re-exploring. The commuting check `compose(children) ⊨ goal` is meant to be TESTED in simmer
+    (§soft-typing), NOT wired here. A malformed mode is a process-invariant bounce."""
     if mode not in _MODES:
         raise ValueError(f"dagger: mode must be one of {_MODES}, got {mode!r}")
-    # TODO: achieve each child in simmer, check goal predicate fires; on miss name the missing
-    # child from the still-false residual and from-kill the decomposition with it.
-    return put(conn, Node(anchor=anchor, post=goal, children=tuple(children), mode=mode))
+    return put(conn, Node(anchor=anchor, post=goal, children=tuple(children), mode=mode, status=status))
 
 
 def merge(into_conn, from_conn):

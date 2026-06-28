@@ -35,6 +35,8 @@ def main() -> None:
     d.add_argument("goal")
     d.add_argument("children", nargs="+", help="child anchors (2+ to branch; the suggested floor)")
     d.add_argument("--mode", choices=("sequence", "conjunction"), default="sequence")
+    d.add_argument("--status", choices=("open", "live", "killed"), default="open",
+                   help="killed = a NEGATIVE/nogood: a plan the trace disproved, to avoid re-exploring")
     i = sub.add_parser("init", help="seed apex + one leaf per action")
     i.add_argument("actions", nargs="+")
     args = p.parse_args()
@@ -52,7 +54,7 @@ def main() -> None:
         else:
             print(f"HIT\n{_fmt(r)}")
     elif args.cmd == "decompose":
-        n = dag.decompose(conn, args.anchor, args.goal, args.children, args.mode)
+        n = dag.decompose(conn, args.anchor, args.goal, args.children, args.mode, args.status)
         print(f"wrote {n.ref()}\n{_fmt(n)}")
     elif args.cmd == "init":
         dag.init(conn, args.actions)
