@@ -914,3 +914,73 @@ forcing — the leave-ambiguous discipline working.)
   may let it run several attempts before yielding, then consolidate the batch. Seam: the trigger
   metric (what counts toward the threshold) + whether a unit yields after one attempt or many.
   All tentative — flagged here so the direction isn't lost, not committed to.
+
+## 2026-06-28 — roadmap: consolidation as its own data pipe (tentative, NOT built)
+
+A design thread, captured so it isn't lost. epmem→pmem consolidation is a FIRST-CLASS DATA PIPE,
+treated as seriously as the act/perceive loop — its own stages, integrity classes, cost model,
+triggers. Keep it LINEAR for now (`admit → translate → tombstone → evict`, no branching/feedback);
+a future version may give the consolidator its OWN cogarch (its own working memory of pending
+episodes, its own attend/abduce/decide over WHAT to consolidate — sleep as an active cognitive
+process, self-similar to the wake loop, even its own surprise when a consolidation it expected to
+commute doesn't). Future work; stay dumb-linear until the linear version visibly strains (ratchet).
+
+The pipe is a **map-filter-reduce** with a deliberate COST ASYMMETRY (doing it all in one
+expensive LLM pass is crude — it re-judges duplicates every time):
+- **filter = cheap admission, MECHANICAL, exact.** Content-addressed dedup (jotter already
+  content-addresses; the bar-masked hash collapses transpositions) + skip-already-spent +
+  novelty-vs-corpus + empty-diff-outside-the-timer-mask. EXACT, never the tolerant matcher —
+  "matcher for the predicate, exact equality for identity" (a wrong tolerant dedup corrupts the
+  cache irrecoverably; a wrong exact one is impossible). Lives in the harness as a tool, e.g.
+  `jotter pending` → the deduped/un-spent/novel admission set. The tool computes, doesn't strategize.
+- **map+reduce = expensive translation, JUDGMENT, on the admission set only.** Abduce a candidate
+  node (map; group-key = the dagger anchor), fold into the semilattice graph (reduce — a causal
+  verdict reduces a contrast PAIR ≥2 episodes, a witness set-adds a trial). Leave-ambiguous is the
+  filter's defer. O(novel), not O(all-epmem).
+
+**Eviction = the compression payoff, and it can be LOOSE — because everything above the action log
+is a regenerable cache.** jotter's real source of truth is the ordered ACTION LOG + determinism:
+RESET+replay regenerates any episode (peek free from cache, restore for budget, simmer free where
+the rule models it). So:
+- *Confidence can be a VIBE, not a `simmer test` gate.* A wrong consolidation/eviction is
+  RECOVERABLE (replay re-derives the episode) — cost is a cheap rebuild, not corruption. (Correcting
+  an earlier over-caution that eviction must be test-gated because it's "irreversible" — it isn't;
+  the deterministic action log is the backstop, so loose judgment is licensed, same regime as the
+  prose matcher.)
+- *It's OK to FORGET DREAMS.* Open/speculative nodes are un-grounded uberty-pole guesses; forgetting
+  one loses nothing verified and it's re-abduced FREE when the configuration recurs. Forget the
+  speculative FIRST under memory pressure; the deferred contrast pair re-forms on replay.
+- Evict freely; steady state = epmem converges to the SURPRISING FRONTIER (holds only what the model
+  can't yet regenerate). Collapse-and-rebuild on rot, the cache/CRDT axiom, taken at its word.
+- The one thing NOT forgettable — keep sacrosanct — is the ordered ACTION LOG. It's the irreducible
+  source the whole cache rebuilds from; evict the heavy grid payloads, dreams, and
+  model-reproducible episodes around it.
+
+Trigger (ties to the cadence bullet above): the sleep pass fires on ADMITTED (post-dedup, un-spent)
+count, not raw episode volume — so a wake pass thrashing over already-seen states doesn't trip a
+wasteful consolidation. Smallest real first step when this leaves the roadmap: a `consolidated-into`
+tombstone on jotter episodes + `jotter pending` as the cheap admission tool; the rest composes on top.
+
+## 2026-06-28 — consolidation pipe, stage 1: cheap mechanical admission + tombstone
+
+Took the roadmap's "smallest real first step" off the page: the consolidate step is now a
+CHEAP-FILTER-then-translate pipe instead of one crude all-in-one LLM pass (the reason being it's
+both more efficient — the LLM only sees what's new — and unit-testable without any LLM round-trips).
+
+- `jotter pending` — the ADMISSION SET: deduped, un-consolidated episodes. Dedup is FREE (jotter
+  already content-addresses; a transition seen at steps 3,4,8 shows once, labelled by first index),
+  exact not tolerant ("matcher for the predicate, exact equality for identity" — a wrong tolerant
+  dedup corrupts the cache, a wrong exact one can't happen). The expensive translation ranges over
+  this, not the whole trace.
+- `jotter spend <idx>... --into <anchor>` — the TOMBSTONE: appends the episodes' content-keys to a
+  SIDECAR ledger (`consolidated.jsonl`), so `pending` shrinks and the grounded trace stays
+  append-only and untouched. Idempotent; resolves any index (even a repeat) to its deduped edge.
+- Pure functions `unique_edges` / `pending_edges` in jotter.graph; ledger IO in jotter.cli; a
+  `jotter` no-args driving-contract so its `--help` is healthy like the rest.
+- Sleep map rewired to the pipe: work `jotter pending`, `dagger decompose` the clean ones, `jotter
+  spend` them, leave the ambiguous ones pending for the next pass. `consolidated.jsonl` added to the
+  checkpointed MEMORY_FILES so spent-state compounds across runs.
+
+Eviction (the compression endgame) deferred — it mutates the sacrosanct corpus and needs the
+tombstone first, which now exists. 3 mechanical unit tests (dedup, admission-minus-spent, spend
+idempotent + trace-untouched), all LLM-free. Full suite 81.

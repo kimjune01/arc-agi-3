@@ -136,10 +136,99 @@ def trace_report(path) -> str:
     return "\n".join(lines)
 
 
+def _rows(path) -> list:
+    import json
+    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()] if path.exists() else []
+
+
+def _ledger(corpus_path):
+    """The consolidation ledger sits beside the corpus — a SIDECAR, so the grounded trace stays
+    append-only and untouched. It records which deduped edges have been consolidated (spent)."""
+    return corpus_path.parent / "consolidated.jsonl"
+
+
+def _spent_keys(ledger_path) -> frozenset:
+    import json
+    if not ledger_path.exists():
+        return frozenset()
+    return frozenset(json.loads(l)["key"] for l in ledger_path.read_text().splitlines() if l.strip())
+
+
+def _counter(rows):
+    return graph.detect_counter([rows[0]["before"]] + [t["after"] for t in rows]) if rows else frozenset()
+
+
+def pending_report(path, ledger_path) -> str:
+    """The ADMISSION SET — deduped, un-consolidated episodes — for the sleep pass to translate. The
+    cheap mechanical filter: dedup is free (content-addressed), spent ones are excluded, so the
+    expensive LLM only sees what's actually new."""
+    rows = _rows(path)
+    if not rows:
+        return "(empty corpus — play with piper first)"
+    counter = _counter(rows)
+    spent = _spent_keys(ledger_path)
+    pend = graph.pending_edges(rows, counter, spent)
+    head = (f"pending (deduped, un-consolidated): {len(pend)} of "
+            f"{len(graph.unique_edges(rows, counter))} unique edges  ({len(spent)} spent)")
+    if not pend:
+        return head + "\n  (nothing pending — all consolidated)"
+    lines = [head]
+    for e in pend:
+        coord = f" ({e['x']},{e['y']})" if e["x"] is not None else ""
+        d = graph.transition_diff(rows[e["idx"]]["before"], rows[e["idx"]]["after"])
+        lines.append(f"  [{e['idx']}] {e['before']} --{e['action']}{coord}--> "
+                     f"{e['after']} : {d.describe(max_cells=4)}")
+    return "\n".join(lines)
+
+
+def spend(path, ledger_path, indices, into) -> str:
+    """Tombstone episodes as consolidated — append their content-keys to the ledger so `pending`
+    shrinks. Idempotent (a key already spent is skipped). Resolves ANY step index to its deduped
+    edge, so spending a repeat works. Does NOT touch the grounded corpus."""
+    import json
+    rows = _rows(path)
+    if not rows:
+        raise SystemExit("jotter: empty corpus — nothing to spend")
+    counter = _counter(rows)
+    existing = set(_spent_keys(ledger_path))
+    added = 0
+    with ledger_path.open("a") as f:
+        for i in indices:
+            if not 0 <= i < len(rows):
+                raise SystemExit(f"jotter: index {i} out of range (0-{len(rows) - 1})")
+            t = rows[i]
+            k = graph.edge_key(graph.state_hash(t["before"], counter), t["action"],
+                               t.get("x"), t.get("y"), graph.state_hash(t["after"], counter))
+            if k in existing:                                  # idempotent: already spent
+                continue
+            f.write(json.dumps({"key": k, "idx": i, "into": into}) + "\n")
+            existing.add(k)
+            added += 1
+    rem = len(graph.pending_edges(rows, counter, frozenset(existing)))
+    return f"spent {added} episode(s){f' into {into}' if into else ''}; {rem} pending"
+
+
+_CONTRACT = """\
+jotter — episodic memory (epmem): the content-addressed, PERMANENT record of what happened.
+
+The grounded trace is append-only ground truth — the evidence pmem nodes cite, never pruned. The
+consolidation pipe reads it through a cheap mechanical filter:
+
+  stats | trace | log | graph    the deduped state graph + trajectory
+  diff [i] | effects | show      what an action did (spatial / count), recovered without re-spending
+  pending                        the ADMISSION SET — deduped, un-consolidated episodes (the cheap filter)
+  spend <idx>... --into <node>   tombstone episodes as consolidated, so `pending` shrinks
+  has <hash> | audit             membership; reconcile vs piper's budget stamps
+
+Pull specifics from `jotter <cmd> --help`. Corpus is $ARCG_STATE_DIR/transitions.jsonl; the spent
+ledger is a sidecar (consolidated.jsonl), so the trace itself stays untouched."""
+
+
 def main() -> None:
-    p = argparse.ArgumentParser(prog="jotter", description="Content-addressed episodic memory.")
+    p = argparse.ArgumentParser(prog="jotter", description="Content-addressed episodic memory.",
+                                epilog=_CONTRACT, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--corpus", default=None)
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd")
     sub.add_parser("stats", help="corpus / graph summary").set_defaults(fn=stats, want=None)
     sub.add_parser("effects", help="grounded per-action effects (resource/quantity facts, from the record)").set_defaults(fn=None, want=None)
     sub.add_parser("trace", help="content-addressed trace of the recorded play (the series-evidence object)").set_defaults(fn=None, want=None)
@@ -151,10 +240,28 @@ def main() -> None:
     sub.add_parser("graph", help="deduped edge list").set_defaults(fn=graph_edges, want=None)
     sh = sub.add_parser("show", help="render a state's grid"); sh.add_argument("hash"); sh.set_defaults(fn=show, want="hash")
     ha = sub.add_parser("has", help="is this state known? exit 0=yes 3=no"); ha.add_argument("hash"); ha.set_defaults(fn=None, want="hash")
+    pe = sub.add_parser("pending", help="admission set: deduped, un-consolidated episodes (the cheap filter)")
+    pe.set_defaults(fn=None, want=None)
+    sp = sub.add_parser("spend", help="tombstone episodes as consolidated into a node (so pending shrinks)")
+    sp.add_argument("index", type=int, nargs="+")
+    sp.add_argument("--into", default=None, help="the dagger anchor they were consolidated into")
+    sp.set_defaults(fn=None, want=None)
     args = p.parse_args()
+
+    if args.cmd is None:               # no-args: the driving-contract (progressive disclosure)
+        print(_CONTRACT)
+        return
 
     from pathlib import Path
     corpus_path = Path(args.corpus) if args.corpus else CORPUS
+
+    if args.cmd == "pending":          # the cheap admission filter (deduped, un-spent)
+        print(pending_report(corpus_path, _ledger(corpus_path)))
+        return
+
+    if args.cmd == "spend":            # tombstone consolidated episodes (sidecar ledger)
+        print(spend(corpus_path, _ledger(corpus_path), args.index, args.into))
+        return
 
     if args.cmd == "effects":          # reads raw transitions (count facts), not the dedup graph
         print(effects_report(corpus_path))

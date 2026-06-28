@@ -27,7 +27,7 @@ _TERMINAL = ("WIN", "GAME_OVER")
 
 # The durable memories — the agent's actual product. A checkpoint is a copy of these; resuming from
 # one is how learning compounds across runs (and how it transfers to another agent/machine).
-MEMORY_FILES = ("notes.md", "transitions.jsonl", "graph.db")
+MEMORY_FILES = ("notes.md", "transitions.jsonl", "graph.db", "consolidated.jsonl")
 
 # The tool allowlists ENFORCE the read/write split between the two passes (not just the prompt):
 #   FORWARD (wake/explore) acts the game and writes jotter + notes; it only READS dagger (the plan
@@ -101,23 +101,25 @@ spend a real action only where simmer is untrustworthy, `arcg note` the finding,
 CONSOLIDATE_TASK = """You are the SLEEP pass of an agent learning ARC-AGI-3. You do NOT play \
 (spend no actions).
 
-GOAL: consolidate episodic memory (jotter's grounded trace + the waking notes) into procedural \
-memory (the dagger plan graph) — promote only the patterns the evidence CLEANLY grounds, and \
-LEAVE THE AMBIGUOUS ONES (no isolating contrast pair, or conflicting evidence) for the next sleep \
-pass; a forced verdict is worse than a deferred one. Then prune the notes you've captured so the \
-next wake pass re-hydrates clean. When the clean patterns are consolidated and their notes pruned, \
-STOP. If nothing is cleanly groundable yet, say so and STOP.
+GOAL: consolidate episodic memory into procedural memory, as a CHEAP-FILTER-then-translate pipe. \
+Work the ADMISSION SET — `jotter pending`, the deduped, un-consolidated episodes — NOT the whole \
+trace (dedup is already done for you; don't re-judge what's consolidated). For each pattern the \
+evidence CLEANLY grounds: `dagger decompose` it (citing the episodes), then `jotter spend` those \
+episodes so they leave the pending set. LEAVE THE AMBIGUOUS ONES un-spent (no isolating contrast \
+pair, or conflicting evidence) — they stay pending for the next pass; a forced verdict is worse \
+than a deferred one. Then prune the notes you captured. When the clean pending episodes are \
+consolidated-and-spent and their notes pruned, STOP. If nothing is cleanly groundable yet, STOP.
 
 Tools — run `uv run <tool> ...` from the repo root; pull specifics from `<tool> --help`:
+  jotter  pending | spend | diff | show — the ADMISSION SET to consolidate; tombstone the consolidated \
+ones; the evidence you cite (never prune the trace)
+  simmer  test — replay the corpus; a MISS means don't promote a mechanic the engine can't reproduce
+  dagger  render | decompose — write/promote a node. `dagger decompose --help` IS the discipline: \
+what a verdict must cite, and when to leave a node open
   arcg    notes | forget | note — read the prose findings; prune captured ones; record a one-line summary
-  jotter  trace | diff | show — the grounded, PERMANENT record (the evidence you cite; never prune it)
-  simmer  test — replay the corpus through the engine; a MISS localizes where the model is wrong (don't \
-promote a mechanic the engine can't reproduce)
-  dagger  render | decompose — the plan graph; write/promote a node. `dagger decompose --help` IS the \
-discipline: what a verdict must cite, and when to leave a node open.
 
-Read the memory, encode the clean verdicts (positive effects AND falsified nogoods, both citing \
-their episodes), prune the now-redundant notes, record one summary line, then STOP."""
+Per clean pattern in `jotter pending`: decompose (cite the episodes) → `jotter spend <those idxs> \
+--into <anchor>`. Leave ambiguous episodes pending. Prune redundant notes, record one line, STOP."""
 
 
 def _build_cmd(task: str, allowed: list, *, model: str, max_turns: int | None) -> list[str]:

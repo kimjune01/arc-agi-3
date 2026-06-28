@@ -174,6 +174,37 @@ def trace(rows: list) -> dict:
     return {"id": tid, **core, "len": len(steps)}
 
 
+def edge_key(hb: str, action: str, x, y, ha: str) -> str:
+    """Canonical content-addressed id for a transition (deduped EDGE): masked from-hash, action,
+    coord, to-hash. Stable across re-indexing — the spent-ledger keys on this, not on step index."""
+    return f"{hb}:{action}:{'' if x is None else x}:{'' if y is None else y}:{ha}"
+
+
+def unique_edges(rows: list, counter=frozenset()) -> list[dict]:
+    """The DEDUPED episode set in first-occurrence order — the cheap admission filter's input.
+    Content-addressing collapses repeats/transpositions for free, so a transition seen at steps
+    3,4,8 appears once (labelled by its first index 3). Each entry: {idx, before, action, x, y,
+    after, key}. The consolidation pipe's `map` ranges over THIS, not the raw repeated corpus."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for i, t in enumerate(rows):
+        hb, ha = state_hash(t["before"], counter), state_hash(t["after"], counter)
+        k = edge_key(hb, t["action"], t.get("x"), t.get("y"), ha)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append({"idx": i, "before": hb, "action": t["action"],
+                    "x": t.get("x"), "y": t.get("y"), "after": ha, "key": k})
+    return out
+
+
+def pending_edges(rows: list, counter=frozenset(), spent: frozenset = frozenset()) -> list[dict]:
+    """The ADMISSION SET: deduped edges whose content-key is NOT yet in the spent ledger. This is
+    the cheap mechanical filter — the expensive LLM translation ranges over only these, not the
+    whole corpus (doing it all in one pass re-judges what's already consolidated)."""
+    return [e for e in unique_edges(rows, counter) if e["key"] not in spent]
+
+
 def transition_diff(before, after):
     """The SPATIAL delta of one recorded transition, via piper's perception (`diff_grids`) — WHAT
     changed and where, not how many. Returns a perception Delta (`.changed`, `.describe()`)."""

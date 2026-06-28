@@ -2,13 +2,55 @@
 
 import numpy as np
 
-from arc_agi_3.jotter.graph import EpMem, detect_counter, state_hash, trace
+from arc_agi_3.jotter.graph import (
+    EpMem, detect_counter, pending_edges, state_hash, trace, unique_edges,
+)
 
 
 def _g(seed):
     g = np.full((4, 4), 3, np.int16)
     g[0, 0] = seed
     return g.tolist()
+
+
+def _t(before, action, after, x=None, y=None):
+    return {"before": before, "action": action, "after": after, "x": x, "y": y}
+
+
+def test_unique_edges_dedups_repeats():
+    """The cheap filter's substrate: content-addressing collapses a repeated transition to one
+    deduped edge, labelled by its FIRST occurrence — so the expensive translation never re-sees it."""
+    A, B = _g(1), _g(2)
+    rows = [_t(A, "ACTION1", B), _t(B, "ACTION2", A), _t(A, "ACTION1", B)]  # 3rd repeats the 1st
+    u = unique_edges(rows)
+    assert [e["idx"] for e in u] == [0, 1]                  # repeat dropped, first-occurrence order
+
+
+def test_pending_excludes_spent():
+    """Admission = deduped MINUS spent. A tombstoned edge-key drops out of the pending set."""
+    A, B = _g(1), _g(2)
+    rows = [_t(A, "ACTION1", B), _t(B, "ACTION2", A)]
+    keys = [e["key"] for e in unique_edges(rows)]
+    pend = pending_edges(rows, spent=frozenset({keys[0]}))
+    assert [e["key"] for e in pend] == [keys[1]]            # the spent one is admitted no more
+
+
+def test_spend_tombstones_idempotently_and_shrinks_pending(tmp_path):
+    """End-to-end mechanical pipe (no LLM): spend writes a sidecar ledger, pending reflects it, and
+    re-spending the same edge is a no-op (the trace itself is never touched)."""
+    import json
+
+    from arc_agi_3.jotter import cli
+    A, B = _g(1), _g(2)
+    corpus = tmp_path / "transitions.jsonl"
+    corpus.write_text("\n".join(json.dumps(t) for t in [_t(A, "ACTION1", B), _t(B, "ACTION2", A)]))
+    ledger = cli._ledger(corpus)
+
+    assert "2 of 2" in cli.pending_report(corpus, ledger)           # nothing spent yet
+    assert cli.spend(corpus, ledger, [0], "node-x").startswith("spent 1")
+    assert "1 of 2" in cli.pending_report(corpus, ledger)           # admission set shrank
+    assert cli.spend(corpus, ledger, [0], "node-x").startswith("spent 0")  # idempotent
+    assert corpus.read_text().count("\n") == 1                      # grounded trace untouched (2 lines)
 
 
 def test_same_grid_hashes_identically():
