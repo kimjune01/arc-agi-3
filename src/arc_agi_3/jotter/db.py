@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   action   TEXT,                         -- leaf: the primitive action token
   children TEXT NOT NULL DEFAULT '[]',   -- compound: JSON list of child anchors
   mode     TEXT,                         -- compound: 'sequence' | 'conjunction'
-  status   TEXT NOT NULL DEFAULT 'open'  -- write-once verdict: open -> live | killed
+  status   TEXT NOT NULL DEFAULT 'open', -- write-once verdict: open -> live | killed
+  evidence TEXT NOT NULL DEFAULT '[]'    -- JSON list of jotter episode/state refs this post is attributed to
 );
 """
 
@@ -42,26 +43,47 @@ def connect(path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    # Migrate a pre-evidence store in place: CREATE IF NOT EXISTS won't add a new column to an
+    # existing table, so back-fill it. Legacy nodes default to '[]' (= speculative), the honest
+    # classification for structure written before attribution was tracked.
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(nodes)")}
+    if "evidence" not in cols:
+        conn.execute("ALTER TABLE nodes ADD COLUMN evidence TEXT NOT NULL DEFAULT '[]'")
+        conn.commit()
     return conn
 
 
 def _row(r: sqlite3.Row) -> dict:
     d = dict(r)
     d["children"] = json.loads(d["children"])
+    d["evidence"] = json.loads(d.get("evidence") or "[]")
     return d
 
 
 def put(conn: sqlite3.Connection, node: dict) -> dict:
     """Idempotent upsert keyed by anchor. On conflict the DOMINANT status wins (killed > live >
-    open) and structure is left as first-written (write-once). Returns the canonical row.
+    open). Returns the canonical row.
 
     `INSERT ... ON CONFLICT DO UPDATE WHERE rank(new) > rank(old)` IS the set-add join: re-putting
-    the same anchor is a no-op unless the verdict ratchets up. The PK makes idempotency structural.
+    the same anchor is a no-op unless the verdict ratchets UP. The PK makes idempotency structural.
+
+    A status ratchet carries the GROUNDING with it: `evidence` is adopted from the winning put, and
+    empty structure (children/mode/post seeded blank) is FILLED — so the dream->verdict lifecycle
+    works (an `open` node promoted to a `killed`/`live` verdict records the contrast pair it cites,
+    instead of silently keeping the open node's empty evidence). NON-empty structure stays
+    write-once: once a node has children/post, a later ratchet can't rewrite them.
     """
     conn.execute(
-        f"""INSERT INTO nodes (anchor, kind, pre, post, action, children, mode, status)
-            VALUES (:anchor, :kind, :pre, :post, :action, :children, :mode, :status)
-            ON CONFLICT(anchor) DO UPDATE SET status = excluded.status
+        f"""INSERT INTO nodes (anchor, kind, pre, post, action, children, mode, status, evidence)
+            VALUES (:anchor, :kind, :pre, :post, :action, :children, :mode, :status, :evidence)
+            ON CONFLICT(anchor) DO UPDATE SET
+                status   = excluded.status,
+                evidence = excluded.evidence,
+                children = CASE WHEN nodes.children = '[]' THEN excluded.children ELSE nodes.children END,
+                mode     = CASE WHEN COALESCE(nodes.mode, '') = '' THEN excluded.mode ELSE nodes.mode END,
+                post     = CASE WHEN nodes.post = '' THEN excluded.post ELSE nodes.post END,
+                kind     = CASE WHEN nodes.children = '[]' AND nodes.action IS NULL
+                                THEN excluded.kind ELSE nodes.kind END
               WHERE ({_RANK.format(s='excluded.status')}) > ({_RANK.format(s='nodes.status')})""",
         {
             "anchor": node["anchor"], "kind": node["kind"],
@@ -69,6 +91,7 @@ def put(conn: sqlite3.Connection, node: dict) -> dict:
             "action": node.get("action"), "mode": node.get("mode"),
             "children": json.dumps(list(node.get("children", []))),
             "status": node.get("status", "open"),
+            "evidence": json.dumps(list(node.get("evidence", []))),
         },
     )
     conn.commit()
@@ -91,7 +114,12 @@ def render(conn: sqlite3.Connection) -> str:
         return "# dagger graph (empty)"
     lines = [f"# dagger graph ({len(rows)} nodes)", ""]
     for d in rows:
-        lines.append(f"## {d['anchor']}  [{d['kind']}, {d['status']}]")
+        # A compound is a claim: mark it grounded (cites episodes) or speculative (a dream, no
+        # evidence yet). Leaves are primitives, not claims, so they carry no provenance tag.
+        prov = ""
+        if d["kind"] == "compound":
+            prov = ", grounded" if d["evidence"] else ", speculative"
+        lines.append(f"## {d['anchor']}  [{d['kind']}, {d['status']}{prov}]")
         if d["post"]:
             lines.append(f"- post: {d['post']}")
         if d["pre"]:
@@ -100,5 +128,7 @@ def render(conn: sqlite3.Connection) -> str:
             lines.append(f"- action: {d['action']}")
         if d["children"]:
             lines.append(f"- {d['mode']}: {' ; '.join(d['children'])}")
+        if d["evidence"]:
+            lines.append(f"- evidence: {', '.join(d['evidence'])}")
         lines.append("")
     return "\n".join(lines).rstrip()

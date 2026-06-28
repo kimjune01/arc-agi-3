@@ -781,3 +781,49 @@ Gap the run exposed + fixed: the agent recorded via `arcg note`, which is SESSIO
 
 Also built the `dagger` CLI (render/get/plan/decompose/init) so the reasoner can inspect and grow
 the plan graph. `reason` + `dagger` registered in [project.scripts]. Full suite 62.
+
+## 2026-06-27 — attribution gate: the sleep pass must ground its own verdicts
+
+Audited a consolidated graph and caught the failure mode the whole design is supposed to prevent:
+`vert-blocked-adj-c9`, a confident `killed` nogood whose post claimed vertical movement is blocked
+"when colour-9 is adjacent below". The trace had the exact minimal pair to test it — A1 moves up at
+one cursor column (`b765`), A1 is a no-op at another (`5695`) — and `jotter show` on that pair shows
+the discriminating feature is **colour-4** (a wall overhang), with colour-9 *constant* across both
+(it's the cursor's own body). The sleep pass named the one variable the contrast rules out. The kill
+was right (the block is real); the *attributed cause* was hallucinated. Nothing in the store could
+have caught it: `Node` had no provenance slot and `decompose` never checked the post against jotter.
+
+Fix: make attribution the consolidate agent's job, not a downstream auditor's, and key it on status
+so the pass stays free to dream.
+- `Node.evidence: tuple[str,...]` + an `evidence` column (in-place `ALTER TABLE` migration; legacy
+  rows back-fill to `[]` = speculative). `render`/`get` mark every compound `grounded` or
+  `speculative`.
+- The gate (`decompose`): `open` is a hypothesis — evidence optional, renders `speculative`, dream
+  freely. `live`/`killed` is a VERDICT — must cite the episode(s) that established it, and a CAUSAL
+  post (a `when`/`because`/`drag`/`adjacent` tripwire) must cite a CONTRAST PAIR (≥2 refs); one
+  episode can't isolate a cause. The semantic check (does the named cause actually DIFFER across the
+  pair?) is the agent's `jotter show` self-check, now spelled out in `CONSOLIDATE_TASK`.
+
+Live drive #1 (run15) validated it cleanly: on a thin trace with no blocked episode, the agent wrote
+`null-cycle [killed, grounded]` citing its round-trip pair `0,1` (verified: returns to the exact
+start hash), and — crucially — demoted the same colour-9 claim to `[open, speculative]`, narrating
+"needs contrast pair to re-establish". The hallucinated verdict became an honest dream because the
+evidence wasn't in the corpus. Discipline tracks evidence, not the model's confidence.
+
+Drive #2 (run16, longer) exposed two real bugs:
+- **The apex was killable.** The agent ran `decompose win-game ... --status killed` and the gate
+  passed it ("win game" is non-causal, evidence supplied), killing the root goal →
+  `plan("win game")` becomes a permanent HOLE; winning is unplannable. Fix: `decompose` refuses the
+  `win-game` anchor (a win recipe is authored under its own anchor with post "win game", matched by
+  `entails`); `dag.put` refuses to ratchet the apex off `open` as defense-in-depth.
+- **Status-ratchet silently dropped grounding.** `db.put`'s `ON CONFLICT` updated status only, so a
+  node seeded empty/open and re-put as a verdict kept the *empty* children+evidence — manufacturing
+  a gate-forbidden `killed`-with-no-evidence row at the storage layer, and breaking the
+  dream→verdict lifecycle (promote an `open` node with its pair → the evidence vanished). Fix: a
+  ratchet now carries `evidence` and fills empty structure once; non-empty structure stays
+  write-once. `open/speculative/()` → promote → `killed/grounded/(b765,5695)` now sticks.
+
+Operational: consolidate timeout 420→660s (the self-check adds `jotter show` turns; run16 timed
+out), and the wake prompt now nudges toward probing edges/obstacles so a *blocked* step actually
+gets recorded — without it the deterministic LS20 prefix just re-derives the same 3-step trace.
+Full suite 71.

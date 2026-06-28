@@ -66,6 +66,82 @@ def test_decompose_rejects_bad_mode():
         dg.decompose(_conn(), "a", "g", ["ACTION1"], "nonsense")
 
 
+# --- attribution gate: dream freely (open), but a verdict must cite its episodes ----------------
+def test_open_node_is_speculative_and_needs_no_evidence():
+    c = _conn()
+    n = dg.decompose(c, "hunch", "ACTION4 probably moves right", ["ACTION4"], "sequence")  # open
+    assert n.status == "open" and n.evidence == () and n.provenance == "speculative"
+    assert "speculative" in dg.render(c)                      # marked, not hidden
+
+
+def test_apex_is_speculative_until_a_winning_episode():
+    c = _conn()
+    dg.init(c, ["ACTION1"])
+    assert dg.get(c, "dagger:win-game").provenance == "speculative"   # no episode wins yet
+
+
+def test_verdict_without_evidence_is_rejected():
+    c = _conn()
+    with pytest.raises(ValueError):                           # a killed nogood is a verdict
+        dg.decompose(c, "x", "ACTION1 then ACTION2 round-trips", ["ACTION1", "ACTION2"],
+                     "sequence", status="killed")
+    with pytest.raises(ValueError):                           # so is a live positive
+        dg.decompose(c, "y", "ACTION1 moves up", ["ACTION1"], "sequence", status="live")
+
+
+def test_causal_verdict_requires_a_contrast_pair():
+    c = _conn()
+    causal = "vertical blocked when colour-9 adjacent below cursor"
+    with pytest.raises(ValueError):                           # one episode can't isolate a cause
+        dg.decompose(c, "blk", causal, ["ACTION1", "ACTION2"], "conjunction",
+                     status="killed", evidence=["5695"])
+    n = dg.decompose(c, "blk", causal, ["ACTION1", "ACTION2"], "conjunction",
+                     status="killed", evidence=["b765", "5695"])   # the pair lands it
+    assert n.status == "killed" and n.evidence == ("b765", "5695") and n.provenance == "grounded"
+
+
+def test_noncausal_verdict_accepts_a_single_episode():
+    c = _conn()
+    n = dg.decompose(c, "up5", "ACTION1 moves the block up 5 rows", ["ACTION1"],
+                     "sequence", status="live", evidence=["0"])
+    assert n.provenance == "grounded" and n.evidence == ("0",)
+
+
+def test_apex_is_unkillable_the_root_goal_stays_reachable():
+    c = _conn()
+    dg.init(c, ["ACTION1"])
+    with pytest.raises(ValueError):                           # decompose may not target the apex
+        dg.decompose(c, dg.WIN_ANCHOR, "win game", ["ACTION1"], "sequence",
+                     status="killed", evidence=["0", "1"])
+    with pytest.raises(ValueError):                           # nor any direct put off `open`
+        dg.put(c, dg.Node(anchor=dg.WIN_ANCHOR, post=dg.WIN, status="killed"))
+    assert dg.get(c, "dagger:win-game").status == "open"      # apex untouched
+    assert isinstance(dg.plan(c, "win game"), dg.Hole)        # winning is still plannable (a HOLE, not killed-away)
+    # a real win recipe lives under its OWN anchor, matched on the post text
+    dg.decompose(c, "win-recipe", "win game", ["ACTION1"], "sequence", status="live", evidence=["0"])
+    assert isinstance(dg.plan(c, "win game"), dg.Node)
+
+
+def test_promotion_carries_evidence_dream_then_ground():
+    c = _conn()
+    causal = "vertical blocked when colour-9 adjacent below"
+    dg.decompose(c, "blk", causal, ["ACTION1", "ACTION2"], "conjunction")   # open dream, no evidence
+    assert dg.get(c, "dagger:blk").provenance == "speculative" and dg.get(c, "dagger:blk").evidence == ()
+    dg.decompose(c, "blk", causal, ["ACTION1", "ACTION2"], "conjunction",   # promote to a verdict...
+                 status="killed", evidence=["b765", "5695"])
+    n = dg.get(c, "dagger:blk")
+    assert n.status == "killed" and n.evidence == ("b765", "5695")          # ...and the grounding STICKS
+    assert n.children == ("ACTION1", "ACTION2")
+
+
+def test_evidence_dedups_and_round_trips_through_the_store():
+    c = _conn()
+    dg.decompose(c, "pair", "horizontal actions drag colour-9 with cursor", ["ACTION3", "ACTION4"],
+                 "conjunction", status="live", evidence=["2", "5", "2", " "])   # dup + blank
+    assert dg.get(c, "pair").evidence == ("2", "5")          # deduped, blanks dropped, persisted
+    assert "evidence: 2, 5" in dg.render(c)
+
+
 def test_render_lists_the_graph():
     c = _conn()
     dg.init(c, ["ACTION1"])

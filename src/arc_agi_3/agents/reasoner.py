@@ -99,7 +99,10 @@ whether or not the score moved.
   2. Pick the ONE question whose answer would teach you the MOST and that you don't already know
      (e.g. "what does ACTIONn change? is any action a no-op? what makes the score change?"). Highest
      value is whatever most reduces your uncertainty about the mechanics or the win condition. Don't
-     re-derive what `arcg notes` already says.
+     re-derive what `arcg notes` already says. Once the basic moves are mapped, the frontier is the
+     CONSTRAINTS: drive the piece to a board edge or against an obstacle and try to move past it — a
+     move that does NOTHING (a blocked step) is as much a finding as one that moves, and it's what
+     tells the win condition's boundaries apart from open space.
   3. Test it with the FEWEST real actions: act, then read `arcg diff` to see what YOUR action caused.
      Some cells may change every step regardless of what you do — isolate the part your action caused.
   4. Record the finding durably (one line): `arcg note "<what you learned>"`. Then END YOUR TURN.
@@ -119,21 +122,41 @@ Read the accumulated memory (all FREE):
   jotter trace | diff | effects    the grounded, PERMANENT record of what actually happened
   dagger render                    the plan graph so far (what's already consolidated)
 
+ATTRIBUTION IS YOUR JOB, not a downstream auditor's. A node you assert as a VERDICT (a positive
+`live` effect or a `killed` nogood) must trace back to the episode(s) that established it — pass
+`--evidence <ref>,<ref>` (step indices like `0,4` or state hashes). A CAUSAL or conditional post
+("blocked WHEN colour-9 adjacent", "horizontal actions DRAG colour-9") needs a CONTRAST PAIR — one
+episode where it holds, one where it doesn't — because a single episode can't isolate a cause. The
+gate REJECTS a causal verdict with fewer than 2 refs. Before you write such a node, run
+`jotter show <stateA> <stateB>` on your pair and CONFIRM the cause you name is the feature that
+DIFFERS across them (present in one, absent in the other) — if it's constant across the pair, it
+is NOT the cause; pick the feature that actually varies, or don't assert it.
+
+You are free to DREAM: an `open` node needs no evidence and renders `speculative` — a hypothesis for
+the next pass to test. Just never dress a guess as a verdict.
+
 Then, in order, then STOP:
   1. CONSOLIDATE a well-grounded, RECURRING pattern as a POSITIVE node — a reliable action effect,
      a sub-procedure that worked, a goal decomposition the evidence supports:
-       uv run dagger decompose <anchor> "<goal predicate>" <child-anchor>... --mode sequence|conjunction
+       uv run dagger decompose <anchor> "<goal predicate>" <child-anchor>... --mode sequence|conjunction --status live --evidence <ref>,<ref>
      Children are action leaves (ACTION1..7) or other subgoal anchors. REUSE an existing anchor, do
      not mint a synonym. Only consolidate what the trace SUPPORTS; skip one-off guesses and anything
-     `dagger render` already has (idempotent — present? do nothing).
+     `dagger render` already has (idempotent — present? do nothing). A hunch you can't yet attribute
+     goes in `--status open` (speculative), or stays a note.
   2. ENCODE a falsified plan as a NEGATIVE node (a nogood) so the next pass AVOIDS the dead end
-     instead of re-discovering it: `uv run dagger decompose <anchor> "<goal that FAILED>" <child>... --status killed`.
-     Do NOT merely forget a falsification — a forgotten dead end gets re-explored and re-wastes budget.
-     Encode the negative FIRST.
-  3. REMEDIATE the notes: a finding now captured in the graph (positive OR negative) is redundant
+     instead of re-discovering it:
+       uv run dagger decompose <anchor> "<goal that FAILED>" <child>... --status killed --evidence <ref>,<ref>
+     A nogood is a verdict: cite the episode(s) (a round-trip nets zero — cite both legs; a block —
+     cite the moves-here / blocked-there pair). Do NOT merely forget a falsification — a forgotten
+     dead end gets re-explored and re-wastes budget. Encode the negative FIRST.
+  3. SELF-CHECK before pruning: re-read each node you just wrote (`dagger render`). For every causal
+     verdict, verify the cited pair actually isolates the named cause (the `jotter show` diff above).
+     If it doesn't, KILL-and-rewrite or downgrade to `open`. A node you can't trace back was wrongly
+     consolidated.
+  4. REMEDIATE the notes: a finding now captured in the graph (positive OR negative) is redundant
      prose — prune it so the next pass re-hydrates clean: `uv run arcg forget "<key phrase>"`. NEVER
      touch jotter — the trace is permanent ground truth; only the prose notes are prunable.
-  4. Record one line: `uv run arcg note "CONSOLIDATED <node>; KILLED <node>; pruned <what>"`.
+  5. Record one line: `uv run arcg note "CONSOLIDATED <node>; KILLED <node>; pruned <what>"`.
 
 Additive on the graph (positive AND negative), lossy only on the prose. If nothing is well-grounded
 enough to consolidate yet, that is fine — say so and STOP. You have ~14 tool calls."""
@@ -163,10 +186,11 @@ def run_forward_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: flo
     return _run_session(FORWARD_TASK, _FORWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
 
 
-def run_backward_unit(*, model: str = "sonnet", max_turns: int = 30, timeout: float = 420.0) -> dict:
+def run_backward_unit(*, model: str = "sonnet", max_turns: int = 30, timeout: float = 660.0) -> dict:
     """One SLEEP pass: consolidate grounded patterns into the DAG and remediate the notes. No play.
     Gets MORE turns than a forward unit — it reads everything, writes several nodes, then prunes, so
-    a forward-unit cap (14) starved it before remediation."""
+    a forward-unit cap (14) starved it before remediation. The attribution self-check adds `jotter
+    show` calls per causal verdict, so the wall-clock budget is wider than a forward unit's."""
     return _run_session(CONSOLIDATE_TASK, _BACKWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
 
 

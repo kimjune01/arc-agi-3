@@ -19,7 +19,9 @@ from . import dag
 
 def _fmt(n) -> str:
     body = f"action {n.action}" if n.is_leaf else f"{n.mode}: {' ; '.join(n.children) or '(none)'}"
-    return f"  {n.ref()}  [{n.kind}, {n.status}]  post={n.post!r}  {body}"
+    prov = "" if n.is_leaf else f", {n.provenance}"
+    ev = f"  evidence={list(n.evidence)}" if n.evidence else ""
+    return f"  {n.ref()}  [{n.kind}, {n.status}{prov}]  post={n.post!r}  {body}{ev}"
 
 
 def main() -> None:
@@ -37,6 +39,10 @@ def main() -> None:
     d.add_argument("--mode", choices=("sequence", "conjunction"), default="sequence")
     d.add_argument("--status", choices=("open", "live", "killed"), default="open",
                    help="killed = a NEGATIVE/nogood: a plan the trace disproved, to avoid re-exploring")
+    d.add_argument("--evidence", default="",
+                   help="comma-separated jotter refs (step indices or state hashes) this post is "
+                        "attributed to. Optional for `open` (speculative); a live/killed VERDICT "
+                        "must cite them, and a causal post needs a contrast pair (2+).")
     i = sub.add_parser("init", help="seed apex + one leaf per action")
     i.add_argument("actions", nargs="+")
     args = p.parse_args()
@@ -54,7 +60,12 @@ def main() -> None:
         else:
             print(f"HIT\n{_fmt(r)}")
     elif args.cmd == "decompose":
-        n = dag.decompose(conn, args.anchor, args.goal, args.children, args.mode, args.status)
+        evidence = [e.strip() for e in args.evidence.split(",") if e.strip()]
+        try:
+            n = dag.decompose(conn, args.anchor, args.goal, args.children, args.mode,
+                              args.status, evidence)
+        except ValueError as e:
+            raise SystemExit(str(e))
         print(f"wrote {n.ref()}\n{_fmt(n)}")
     elif args.cmd == "init":
         dag.init(conn, args.actions)
