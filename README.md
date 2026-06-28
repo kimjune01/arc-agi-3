@@ -61,3 +61,11 @@ uv run arc3 --agent claude --game ls20   # programmatic Claude policy (JSON in/o
   `arc3` policy (legacy; bypasses `arcg` — migration to the surface pending)
 - `AGENT.md` — playbook handed to Claude when it plays via `arcg`
 - `tests/` — offline proofs (layering, consistency, perception, session, loop, parser)
+
+## License
+
+Dual, by kind:
+
+- **Code** — [GPL-3.0](./LICENSE).
+- **Prose & docs** (`*.md`) — [CC BY-SA-NS](./LICENSE-CONTENT.md): CC BY-SA 4.0
+  plus a Network Services clause (the AGPL idea, for prose).
