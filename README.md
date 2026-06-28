@@ -11,56 +11,82 @@ uv sync
 cp .env.example .env      # then paste your free key from three.arcprize.org
 ```
 
-## Play (default: agentic)
+## Entrypoints
 
-The default agent is Claude driving the game itself through a stateful CLI.
-Point it at the playbook and let it go:
+Seven `uv run` commands, each a thin CLI over one module. They share state through
+`ARCG_STATE_DIR` (default `.arc/`), so one run's game, world-model, and memory are one
+shared substrate. Pull specifics from `uv run <cmd> --help`.
+
+| command  | role | key verbs |
+|----------|------|-----------|
+| `arcg`   | **the hands** — stateful game surface (the only thing that spends budget) | `start` · `act`/`move`/`interact`/`click` · `look`/`diff` · `snapshot`/`restore`/`peek` · `note` · `end` |
+| `simmer` | **the world model** — free forward prediction (plan here, commit in `arcg`) | `predict` · `test` · `step` |
+| `jotter` | **episodic memory** — the grounded transition corpus | `stats` · `effects` · `trace` · `pending` · `spend` · `evict` · `show` |
+| `dagger` | **procedural memory** — the Action DAG of goal→action decompositions | `render` · `plan` · `decompose` · `get` · `init` |
+| `drive`  | **the loop** (programmatic) — gated serial exploit/explore over the above | `drive ls20 --budget 25 [--goal ... --max-steps N]` |
+| `reason` | **the loop** (agentic) — Claude-Code as reasoner, alternating wake/sleep | `reason ls20 --units N --cycles N --budget N [--checkpoint DIR]` |
+| `arc3`   | **baselines** (legacy, non-agentic) — random / programmatic-Claude policy | `arc3 --agent random|claude --game ls20` |
+
+## Play
+
+**Agentic, hand-driven** — point a fresh Claude at the playbook and let it call `arcg`:
 
 ```bash
 claude "Read AGENT.md, then play ls20 with the arcg tools until WIN or GAME_OVER."
 ```
 
-It plays by calling these `arcg` commands and reading their stdout; the session
-(ids, grid, affinity cookies, notes) persists in `.arc/session.json` between
-calls, so each command continues the same game:
+The session (ids, grid, affinity cookies, notes) persists in `.arc/session.json` between
+calls, so each command continues the same game. `arcg` is layered (`arcg/manifest.py`):
+**0** protocol (`start/act/end`) · **1** intent+perception (`move/interact/click/undo/look/diff`)
+· **2** state+determinism (`history/snapshot/restore/peek`) · **3** memory (`note`). Each layer
+imports strictly downward; only Layer 0 touches the API client (enforced by `tests/test_layering.py`).
+The game is deterministic after RESET, so a state *is* its action sequence — `restore` replays to
+it and verifies the determinism holds.
+
+**Self-driving** — the wake/sleep harness drives the whole loop itself:
 
 ```bash
-uv run arcg start ls20 --budget 15  # open, reset; tight cap for test runs
-uv run arcg look                    # render the board
-uv run arcg move left               # intent; prints the delta + new frame
-uv run arcg snapshot base           # name the current state (= action sequence)
-uv run arcg peek base               # view it from cache — free, no budget
-uv run arcg restore base            # reset+replay back to it — costs budget
-uv run arcg end                     # close scorecard, clear session
+uv run reason ls20 --units 4 --budget 20 --checkpoint checkpoints/ls20-firstpoint
 ```
 
-Commands are layered (`arcg/manifest.py`): **0** protocol (`start/act/end`) ·
-**1** intent+perception (`move/interact/click/undo/look/diff`) · **2**
-state+determinism (`history/snapshot/restore/peek`) · **3** memory (`note`).
-Each layer imports strictly downward; only Layer 0 touches the API client
-(enforced by `tests/test_layering.py`). The game is deterministic after RESET, so
-a state *is* its action sequence — `restore` replays to it and verifies the
-determinism holds.
-
-## Baselines (non-agentic)
-
-```bash
-uv run arc3 --agent random --game ls20   # random floor: loses, scores 0
-uv run arc3 --agent claude --game ls20   # programmatic Claude policy (JSON in/out)
-```
+It alternates WAKE passes (explore, act, record to jotter) with a SLEEP pass (consolidate
+episodes into dagger), resuming durable memory from a checkpoint so learning compounds.
 
 ## Layout
 
-- `src/arc_agi_3/client.py` — REST client (auth, cookies, scorecard, game loop)
-- `src/arc_agi_3/structs.py` — `FrameData`, `GameAction`, `GameState`, `Action`
-- `src/arc_agi_3/agents/` — `base.Agent` (loop+verdict), `random_agent`
-- `src/arc_agi_3/arcg/` — the layered `arcg` surface (manifest, store, layer0-3, cli)
-- `src/arc_agi_3/client.py` · `perception.py` · `structs.py` — Layer 0/1 internals + vocabulary
-- `src/arc_agi_3/session.py` — persisted session substrate
-- `src/arc_agi_3/policy_claude.py` + `agents/llm_agent.py` + `main.py` — programmatic
-  `arc3` policy (legacy; bypasses `arcg` — migration to the surface pending)
-- `AGENT.md` — playbook handed to Claude when it plays via `arcg`
-- `tests/` — offline proofs (layering, consistency, perception, session, loop, parser)
+Organized by the role each part plays in the loop (`perceive → predict → act → reconcile → note`):
+
+**The hands** — `arcg/` the layered game surface: `layer0_protocol` (API) · `layer1_intent` +
+`perception.py` (move/look/diff) · `layer2_state` (snapshot/restore) · `layer3_memory` (note) ·
+`manifest`, `store`, `trace`, `gates`, `cli`.
+
+**The world model** — `simmer/`: `engine.py` (the prior-free forward model) · `cli` (predict/test/step).
+
+**Episodic memory** — `jotter/`: `graph.py` (content-addressed state/transition graph, dedup,
+eviction) · `db.py` (the SQLite node store) · `cli`.
+
+**Procedural memory** — `dagger/`: `dag.py` (the Action DAG — goal→action decompositions, JIT-on-miss,
+graded confidence; the retention stub lives here) · `cli`. Design: [`DAGGER.md`](./DAGGER.md).
+
+**The loop** — `driver/loop.py` (programmatic exploit/explore, `decide`+`run`) ·
+`agents/reasoner.py` (the agentic wake/sleep harness).
+
+**Substrate** — `client.py` (REST: auth, cookies, scorecard) · `structs.py` (`FrameData`,
+`GameAction`, `GameState`, `Action`) · `session.py` (persisted run state) · `perception.py` (vocabulary).
+
+**Baselines (legacy)** — `main.py` + `policy_claude.py` + `agents/{base,random_agent,llm_agent}.py`:
+the non-agentic `arc3` policy that bypasses `arcg` (migration to the surface pending).
+
+**Tests** — `tests/`: offline proofs (layering, consistency, perception, session, loop, dagger, jotter, simmer).
+
+## Docs
+
+- [`EXPLAINER.md`](./EXPLAINER.md) — the map for a fresh Claude about to play: the loop, tools, principles
+- [`AGENT.md`](./AGENT.md) — the playbook handed to Claude when it plays via `arcg`
+- [`PLAN.md`](./PLAN.md) — the architecture and its rationale
+- [`DAGGER.md`](./DAGGER.md) — the Action DAG (procedural memory) design
+- [`NOTES.md`](./NOTES.md) — research log and ARC-AGI-3 API ground truth
+- [`WORKLOG.md`](./WORKLOG.md) — dated build log (rotates to `WORKLOG.1.md`)
 
 ## License
 
