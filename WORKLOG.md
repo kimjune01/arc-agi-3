@@ -1177,3 +1177,26 @@ DEPENDENCY GRAPH (composing nodes), which classical GDSF doesn't price. Suite st
 This is the buildable seam for the paper's open-problem #3 (ablate retention in a live world-model
 agent): frequency-keep vs utility-keep on a library that now contains one certified divergence-corner
 skill. Not run yet — stub names the criterion; wiring waits on the cost-class field.
+
+## 2026-06-28 — spec-conformance fixes (verified the score signal against the OpenAPI rules)
+
+Looked up the rules to verify "score-up is a durable, universal signal" (it is): the live
+FrameResponse carries `levels_completed` ("Current CUMULATIVE number of levels completed", monotonic
+within a run), `win_levels` ("Mirrors the game's configured win condition so agents can adapt
+dynamically without HARD-CODING values"), and `state`. So the win scaffold is API-given and
+game-invariant — reward = Δlevels_completed>0, win = levels_completed==win_levels (→ WIN), fail =
+GAME_OVER — and the agent should READ win_levels, not bake LS20's 7. (The RHAE `score` 0-254 is a
+SEPARATE aggregate that lives only in the scorecard summary at close, not the live frame; our
+in-session `score`=levels_completed mapping is correct.)
+
+The lookup surfaced obvious gaps; fixed with failing-tests-first (tests/test_structs.py, +4):
+- `GameState` was MISSING `NOT_STARTED` (the API's post-terminal "run ended, awaiting RESET" state)
+  — `GameState("NOT_STARTED")` raised. Added it; added to `is_terminal` and to the driver +
+  reasoner `_TERMINAL` sets (a run reporting NOT_STARTED must stop, not act).
+- `frame` docstrings called the array "one per visible LAYER"; the spec says consecutive ANIMATION
+  frames that SETTLE on the last. `grid` already returns `frame[-1]` (correct) — fixed the docs so it
+  isn't "simplified" away, and added a settling test.
+- Documented `score`=levels_completed (live progress) vs the RHAE scorecard score, and win_score=
+  win_levels (read, never hard-code).
+
+Suite 87 -> 91. No behavior change beyond not crashing on NOT_STARTED and stopping on it.

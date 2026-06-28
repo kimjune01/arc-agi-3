@@ -23,7 +23,7 @@ from ..arcg import store
 from ..session import STATE_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]   # .../src/arc_agi_3/agents/ -> repo root
-_TERMINAL = ("WIN", "GAME_OVER")
+_TERMINAL = ("WIN", "GAME_OVER", "NOT_STARTED")  # NOT_STARTED = run ended, awaiting RESET
 
 # The durable memories — the agent's actual product. A checkpoint is a copy of these; resuming from
 # one is how learning compounds across runs (and how it transfers to another agent/machine).

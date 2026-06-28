@@ -17,7 +17,7 @@ from ..jotter.graph import state_hash
 from ..simmer.engine import MODELED
 from ..simmer.engine import step as simmer_step
 
-_TERMINAL = ("WIN", "GAME_OVER")
+_TERMINAL = ("WIN", "GAME_OVER", "NOT_STARTED")  # NOT_STARTED = run ended, awaiting RESET
 _DEFAULT_ACTIONS = ["ACTION1", "ACTION2", "ACTION3", "ACTION4"]
 
 

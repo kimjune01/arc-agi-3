@@ -1,7 +1,10 @@
 """Core data structures mirroring the ARC-AGI-3 game protocol.
 
-The grid `frame` is a list of 2D integer arrays (one per visible layer; usually
-length 1). Cell values are colour indices 0-15, the same palette as ARC-AGI-1/2.
+`frame` is a list of consecutive 64x64 grids — *animation steps*, not layers: the
+engine may advance internally before settling, so the SETTLED state is the LAST
+grid (`grid` returns `frame[-1]`). Cell values are colour indices 0-15, the same
+palette as ARC-AGI-1/2. (Verified against the OpenAPI FrameResponse schema,
+docs.arcprize.org/arc3v1.yaml.)
 """
 
 from __future__ import annotations
@@ -11,10 +14,14 @@ from enum import Enum
 
 
 class GameState(str, Enum):
-    """Lifecycle of a single game session."""
+    """Lifecycle of a single game session. The API emits NOT_FINISHED / NOT_STARTED /
+    WIN / GAME_OVER; NOT_PLAYED is our local pre-RESET sentinel (never sent by the API).
+    NOT_STARTED means the run ENDED (WIN or GAME_OVER) and now needs a RESET — terminal
+    for a driver's purposes."""
 
-    NOT_PLAYED = "NOT_PLAYED"
-    NOT_FINISHED = "NOT_FINISHED"
+    NOT_PLAYED = "NOT_PLAYED"      # local sentinel: before the first RESET
+    NOT_FINISHED = "NOT_FINISHED"  # run active
+    NOT_STARTED = "NOT_STARTED"    # run ended, awaiting RESET (post-terminal)
     WIN = "WIN"
     GAME_OVER = "GAME_OVER"
 
@@ -78,14 +85,19 @@ class Action:
 
 @dataclass
 class FrameData:
-    """One observation returned by the API after RESET or an action."""
+    """One observation returned by the API after RESET or an action.
+
+    `score`/`win_score` are the live `levels_completed`/`win_levels`: the in-session
+    PROGRESS signal (monotonic, "cumulative" per the spec), the same for every game.
+    This is NOT the RHAE efficiency `score` (0-254) — that exists only in the scorecard
+    summary at close, not in the live frame. Win predicate: `score == win_score`."""
 
     game_id: str
     guid: str | None
     state: GameState
     frame: list[list[list[int]]] = field(default_factory=list)
-    score: int = 0
-    win_score: int | None = None
+    score: int = 0          # = levels_completed (live progress), NOT the RHAE scorecard score
+    win_score: int | None = None  # = win_levels; READ it, never hard-code (spec)
     available_actions: list[GameAction] = field(default_factory=list)
     raw: dict = field(default_factory=dict)
 
@@ -96,7 +108,8 @@ class FrameData:
 
     @property
     def is_terminal(self) -> bool:
-        return self.state in (GameState.WIN, GameState.GAME_OVER)
+        # NOT_STARTED is post-terminal (run ended, awaiting RESET) — also a stop signal.
+        return self.state in (GameState.WIN, GameState.GAME_OVER, GameState.NOT_STARTED)
 
     @classmethod
     def from_json(cls, data: dict) -> "FrameData":
