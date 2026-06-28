@@ -827,3 +827,52 @@ Operational: consolidate timeout 420→660s (the self-check adds `jotter show` t
 out), and the wake prompt now nudges toward probing edges/obstacles so a *blocked* step actually
 gets recorded — without it the deterministic LS20 prefix just re-derives the same 3-step trace.
 Full suite 71.
+
+## 2026-06-28 — watch the loop learn: a remediation bug, and prompts → progressive disclosure
+
+Ran the wake/sleep loop on LS20 (`reason --units 3 --cycles 1`, checkpointed off the existing
+graph, live session in a throwaway dir so `.arc` stays clean) and *watched it learn into the
+tools* — wake recorded findings to jotter+notes, sleep consolidated into dagger. Three things the
+watch surfaced (the probe-of-the-system payoff a score line would have hidden):
+
+- **B — remediation was silently broken.** The sleep pass logged "pruning skipped (notes
+  unreadable)". Root cause: `CONSOLIDATE_TASK` tells the pass to re-hydrate with `arcg notes`, but
+  `_BACKWARD_ALLOWED` granted only `arcg note`/`arcg forget` — `notes` is a distinct subcommand
+  (`cli.py` registers note/notes/forget separately), so the read was denied and the pass could
+  never see the notes to prune them. The corpus grows unbounded — "memory is a cache" defeated.
+  Failing-test-first (`test_consolidate_pass_may_read_the_commands_it_is_told_to`: every `uv run
+  arcg <cmd>` the task names must be permitted by the allowlist), then granted `arcg notes:*`.
+  **Live-validated**: a fresh sleep pass then read the notes, **pruned 4**, and consolidated
+  `move-wall-block [live, grounded, ev 2,8]` — the *correct* generalization of the left-blocked
+  constraint (real cause = colour-4 wall collision, isolated by a step-2-open vs step-8-walled
+  pair), even reconciling the old `vert-blocked-adj-c9` hallucination (mis-attributed to colour-9
+  adjacency; real cause is the wall).
+- **A — a forced verdict.** The same run had promoted `lateral-drag-c9` to `[live, grounded]` by
+  reading the cursor's own colour-9 *tail* sliding as "dragging colour-9 objects" — conflating the
+  cursor's body with external objects, though the cycle's own wake notes said the opposite ("tail
+  is the cursor's shadow"; "the cage colour-9 did NOT drag"). The cited pair shows cursor+tail
+  moving, not external-object drag. Same class as the run16 hallucination, one level up: the gate
+  enforces *≥2 refs* but can't enforce that the pair *isolates* the claim. The fix is not another
+  rule — it's the sleep goal stated plainly (below): consolidate what's CLEANLY grounded, **leave
+  the ambiguous ones for the next pass**. A forced verdict is worse than a deferred one.
+
+**Prompts → progressive disclosure (the larger change).** The two task prompts had grown into
+~50-line manuals duplicating — and outliving the accuracy of — what `--help` should own (e.g.
+`dagger decompose --help` already carried the attribution rule the prompt re-explained). Rebuilt
+per the PLAN.md onboarding design: the prompt is the **map** (layer 1, role-scoped — wake vs sleep
+*is* the first disclosure split), `<tool> --help` the reference (layer 2), `<tool> <cmd> --help`
+the specifics (layer 3).
+- `FORWARD_TASK`/`CONSOLIDATE_TASK` are now short, goal-based maps that defer to `--help`. The
+  sleep map leads with its goal verbatim: *consolidate epmem (jotter) into pmem (dagger); promote
+  the clean, leave the ambiguous for the next pass.*
+- Reference migrated into `--help`, kept healthy: `dagger` no-args prints a driving-contract;
+  `dagger decompose --help` carries the full discipline (status meanings, the contrast-pair
+  `jotter show` self-check, and the leave-ambiguous rule = the principled fix for A); every `arcg
+  <cmd> --help` now surfaces its description (added `description=help` in the `add` helper), and
+  `arcg look --help` carries the EXPENSIVE cost-note moved out of the prompt.
+- **No hard turn cap.** The session is bounded by its GOAL (the prompt's STOP), not a turn count;
+  `--max-turns` is dropped (was 14/30 — the 14-cap once starved the sleep pass before remediation),
+  `timeout` is the runaway backstop only. `_build_cmd` extracted so this is unit-tested.
+
+New tests pin all of it (light/goal-based maps; wake+sleep allowlists grant what their maps name;
+no `--max-turns` by default; `dagger decompose --help` carries the discipline). Full suite 76.

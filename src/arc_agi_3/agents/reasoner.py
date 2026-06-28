@@ -37,7 +37,8 @@ MEMORY_FILES = ("notes.md", "transitions.jsonl", "graph.db")
 _FORWARD_ALLOWED = ["Bash(uv run arcg:*)", "Bash(uv run jotter:*)",
                     "Bash(uv run dagger render:*)", "Bash(uv run dagger plan:*)",
                     "Bash(uv run dagger get:*)"]
-_BACKWARD_ALLOWED = ["Bash(uv run arcg note:*)", "Bash(uv run arcg forget:*)",
+_BACKWARD_ALLOWED = ["Bash(uv run arcg notes:*)", "Bash(uv run arcg note:*)",
+                     "Bash(uv run arcg forget:*)",
                      "Bash(uv run jotter:*)", "Bash(uv run dagger:*)"]
 
 
@@ -62,111 +63,62 @@ def _save_checkpoint(dst: Path) -> None:
         if p.exists():
             shutil.copy2(p, dst / f)
 
-FORWARD_TASK = """You are the FORWARD (waking) pass of an agent studying ARC-AGI-3, an unknown \
-64x64 grid game. You EXPLORE and RECORD; a separate sleep pass later turns your records into \
-reusable structure. YOUR GOAL IS TO LEARN AND LEAVE DURABLE MEMORY — not to play or win. The \
-product of your turn is a recorded finding the next session inherits, NOT a higher score. Score \
-moving is a SIGNAL to learn from ("what did I do that changed it?"), and winning is a SIDE EFFECT \
-of understanding the game well enough; neither is the objective. Maximize WHAT YOU LEARN per action.
+FORWARD_TASK = """You are the WAKE pass of an agent studying ARC-AGI-3, an unknown 64x64 grid \
+game already in progress (the harness owns its lifecycle — do NOT start/end it). You know nothing \
+about the rules; learn only by acting and watching what changes. You are a FRESH session — your \
+memory is on disk, so re-hydrate before acting.
 
-You know NOTHING about the rules: not what any action does, not whether there is a character, \
-movement, or a goal object — some games have no movement at all. Assume nothing; learn ONLY by \
-acting and watching what changes. A game is ALREADY IN PROGRESS with a tight action budget (every \
-act is costly; inspection is free). You are a FRESH session with no memory — it lives on disk, so \
-re-hydrate first.
+GOAL: grow episodic memory by ONE new grounded finding the next session inherits. Not a higher \
+score — score moving is only a SIGNAL to learn from. Pick the single question that most reduces \
+your uncertainty (what does an action do? is any a no-op? what moves the score?); once the basic \
+moves are mapped, the frontier is the CONSTRAINTS — drive into walls and edges, because a BLOCKED \
+move is as much a finding as one that moves. Spend the FEWEST real actions to settle it, record \
+it, then STOP. Inspection is free; acting costs budget.
 
-Toolbox (all via `uv run <tool> ...`, run from the repo root):
-  arcg actions                          which ACTION1..7 are available right now (FREE).
-  arcg objects | diff                   perceive COMPACTLY: `objects` lists the connected pieces;
-                                        `diff` shows just what changed after your last action.
-  arcg look                             the full 64x64 grid — AVOID it (each dump bloats context and
-                                        slows every later turn; repeating it is what times a unit out).
-                                        At most ONCE, only if objects+diff can't answer your question.
-  arcg act ACTIONn [--x N --y N]        ACT (spends one budget unit). You don't know what any action
-                                        does — discover it. Some actions take a coordinate; most don't.
-  arcg note "<finding>" | notes         your DURABLE memory across sessions (survives the session).
-  jotter stats | effects | diff | trace read the grounded record (FREE). `effects` = per-action COUNT
-                                        facts (e.g. something that changes every step no matter what you
-                                        do); `jotter diff` = what changed SPATIALLY per recorded action —
-                                        recover an action's effect from the record WITHOUT re-spending.
-  dagger render | plan <goal>           READ the plan graph the sleep pass built (FREE). Use it to
-                                        avoid re-deriving what's already structured. You only READ
-                                        it — writing the graph is the sleep pass's job, not yours.
+Tools — run `uv run <tool> ...` from the repo root; pull specifics from `<tool> --help`:
+  arcg    actions | objects | diff | act | note — available actions; perceive; ACT (costs budget); record a finding
+  jotter  stats | effects | diff | trace — the grounded record; recover an action's effect WITHOUT re-spending
+  dagger  render | plan — READ the plan graph the sleep pass built (you only read it)
 
-Do exactly ONE UNIT OF EXPERIMENT, then STOP. The unit succeeds if it leaves a new durable finding,
-whether or not the score moved.
-  1. Re-hydrate: `arcg notes`, `arcg actions`, `jotter stats`, `jotter effects`, `jotter diff`, `arcg objects`.
-  2. Pick the ONE question whose answer would teach you the MOST and that you don't already know
-     (e.g. "what does ACTIONn change? is any action a no-op? what makes the score change?"). Highest
-     value is whatever most reduces your uncertainty about the mechanics or the win condition. Don't
-     re-derive what `arcg notes` already says. Once the basic moves are mapped, the frontier is the
-     CONSTRAINTS: drive the piece to a board edge or against an obstacle and try to move past it — a
-     move that does NOTHING (a blocked step) is as much a finding as one that moves, and it's what
-     tells the win condition's boundaries apart from open space.
-  3. Test it with the FEWEST real actions: act, then read `arcg diff` to see what YOUR action caused.
-     Some cells may change every step regardless of what you do — isolate the part your action caused.
-  4. Record the finding durably (one line): `arcg note "<what you learned>"`. Then END YOUR TURN.
-
-Do NOT run `arcg start` or `arcg end` — the harness owns the game lifecycle. One hypothesis tested
-and recorded is a complete unit. You have ~14 tool calls — don't dawdle: re-hydrate, act once or
-twice, record, stop. Keep it small so the next session can refresh cleanly."""
+Re-hydrate (`arcg notes`, `jotter trace`, `dagger render`, `arcg objects`), answer your one \
+question with minimal actions, `arcg note` the finding, then STOP."""
 
 
-CONSOLIDATE_TASK = """You are the BACKWARD (sleep) pass of an agent learning ARC-AGI-3. You do NOT
-play and spend NO actions. Your job: turn what the waking pass learned into reusable STRUCTURE in
-the plan graph, and REMEDIATE the memory — so the next waking pass inherits procedures, not an
-ever-growing pile of prose.
+CONSOLIDATE_TASK = """You are the SLEEP pass of an agent learning ARC-AGI-3. You do NOT play \
+(spend no actions).
 
-Read the accumulated memory (all FREE):
-  arcg notes                       the waking pass's prose findings (the compressible scratchpad)
-  jotter trace | diff | effects    the grounded, PERMANENT record of what actually happened
-  dagger render                    the plan graph so far (what's already consolidated)
+GOAL: consolidate episodic memory (jotter's grounded trace + the waking notes) into procedural \
+memory (the dagger plan graph) — promote only the patterns the evidence CLEANLY grounds, and \
+LEAVE THE AMBIGUOUS ONES (no isolating contrast pair, or conflicting evidence) for the next sleep \
+pass; a forced verdict is worse than a deferred one. Then prune the notes you've captured so the \
+next wake pass re-hydrates clean. When the clean patterns are consolidated and their notes pruned, \
+STOP. If nothing is cleanly groundable yet, say so and STOP.
 
-ATTRIBUTION IS YOUR JOB, not a downstream auditor's. A node you assert as a VERDICT (a positive
-`live` effect or a `killed` nogood) must trace back to the episode(s) that established it — pass
-`--evidence <ref>,<ref>` (step indices like `0,4` or state hashes). A CAUSAL or conditional post
-("blocked WHEN colour-9 adjacent", "horizontal actions DRAG colour-9") needs a CONTRAST PAIR — one
-episode where it holds, one where it doesn't — because a single episode can't isolate a cause. The
-gate REJECTS a causal verdict with fewer than 2 refs. Before you write such a node, run
-`jotter show <stateA> <stateB>` on your pair and CONFIRM the cause you name is the feature that
-DIFFERS across them (present in one, absent in the other) — if it's constant across the pair, it
-is NOT the cause; pick the feature that actually varies, or don't assert it.
+Tools — run `uv run <tool> ...` from the repo root; pull specifics from `<tool> --help`:
+  arcg    notes | forget | note — read the prose findings; prune captured ones; record a one-line summary
+  jotter  trace | diff | show — the grounded, PERMANENT record (the evidence you cite; never prune it)
+  dagger  render | decompose — the plan graph; write/promote a node. `dagger decompose --help` IS the \
+discipline: what a verdict must cite, and when to leave a node open.
 
-You are free to DREAM: an `open` node needs no evidence and renders `speculative` — a hypothesis for
-the next pass to test. Just never dress a guess as a verdict.
-
-Then, in order, then STOP:
-  1. CONSOLIDATE a well-grounded, RECURRING pattern as a POSITIVE node — a reliable action effect,
-     a sub-procedure that worked, a goal decomposition the evidence supports:
-       uv run dagger decompose <anchor> "<goal predicate>" <child-anchor>... --mode sequence|conjunction --status live --evidence <ref>,<ref>
-     Children are action leaves (ACTION1..7) or other subgoal anchors. REUSE an existing anchor, do
-     not mint a synonym. Only consolidate what the trace SUPPORTS; skip one-off guesses and anything
-     `dagger render` already has (idempotent — present? do nothing). A hunch you can't yet attribute
-     goes in `--status open` (speculative), or stays a note.
-  2. ENCODE a falsified plan as a NEGATIVE node (a nogood) so the next pass AVOIDS the dead end
-     instead of re-discovering it:
-       uv run dagger decompose <anchor> "<goal that FAILED>" <child>... --status killed --evidence <ref>,<ref>
-     A nogood is a verdict: cite the episode(s) (a round-trip nets zero — cite both legs; a block —
-     cite the moves-here / blocked-there pair). Do NOT merely forget a falsification — a forgotten
-     dead end gets re-explored and re-wastes budget. Encode the negative FIRST.
-  3. SELF-CHECK before pruning: re-read each node you just wrote (`dagger render`). For every causal
-     verdict, verify the cited pair actually isolates the named cause (the `jotter show` diff above).
-     If it doesn't, KILL-and-rewrite or downgrade to `open`. A node you can't trace back was wrongly
-     consolidated.
-  4. REMEDIATE the notes: a finding now captured in the graph (positive OR negative) is redundant
-     prose — prune it so the next pass re-hydrates clean: `uv run arcg forget "<key phrase>"`. NEVER
-     touch jotter — the trace is permanent ground truth; only the prose notes are prunable.
-  5. Record one line: `uv run arcg note "CONSOLIDATED <node>; KILLED <node>; pruned <what>"`.
-
-Additive on the graph (positive AND negative), lossy only on the prose. If nothing is well-grounded
-enough to consolidate yet, that is fine — say so and STOP. You have ~14 tool calls."""
+Read the memory, encode the clean verdicts (positive effects AND falsified nogoods, both citing \
+their episodes), prune the now-redundant notes, record one summary line, then STOP."""
 
 
-def _run_session(task: str, allowed: list, *, model: str, max_turns: int, timeout: float) -> dict:
+def _build_cmd(task: str, allowed: list, *, model: str, max_turns: int | None) -> list[str]:
+    """The `claude` invocation for one session. `max_turns=None` adds NO `--max-turns` flag: the
+    session is bounded by its GOAL (the prompt's STOP), not a hard turn cap. A hard cap starves a
+    pass mid-unit (it once cut the sleep pass off before remediation); goal-based termination doesn't."""
+    cmd = ["claude", "-p", task, "--output-format", "json", "--model", model]
+    if max_turns is not None:
+        cmd += ["--max-turns", str(max_turns)]
+    return cmd + ["--allowedTools", *allowed]
+
+
+def _run_session(task: str, allowed: list, *, model: str, max_turns: int | None, timeout: float) -> dict:
     """Run one fresh agentic claude session with a given task + tool allowlist. Context is fresh each
-    call; the durable memory on disk persists. Returns the parsed result (text + cost/turns)."""
-    cmd = ["claude", "-p", task, "--output-format", "json", "--model", model,
-           "--max-turns", str(max_turns), "--allowedTools", *allowed]
+    call; the durable memory on disk persists. Returns the parsed result (text + cost/turns). The
+    session self-terminates at its goal; `timeout` is only the runaway backstop (the andon cord)."""
+    cmd = _build_cmd(task, allowed, model=model, max_turns=max_turns)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=PROJECT_ROOT)
     except subprocess.TimeoutExpired:
@@ -181,16 +133,18 @@ def _run_session(task: str, allowed: list, *, model: str, max_turns: int, timeou
             "turns": data.get("num_turns"), "cost_usd": data.get("total_cost_usd")}
 
 
-def run_forward_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300.0) -> dict:
-    """One WAKE pass: explore, act, record to jotter+notes; only READ the plan graph."""
+def run_forward_unit(*, model: str = "sonnet", max_turns: int | None = None, timeout: float = 300.0) -> dict:
+    """One WAKE pass: explore, act, record to jotter+notes; only READ the plan graph. Bounded by its
+    GOAL (one recorded finding, then STOP), not a turn count; `timeout` is the runaway backstop."""
     return _run_session(FORWARD_TASK, _FORWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
 
 
-def run_backward_unit(*, model: str = "sonnet", max_turns: int = 30, timeout: float = 660.0) -> dict:
+def run_backward_unit(*, model: str = "sonnet", max_turns: int | None = None, timeout: float = 660.0) -> dict:
     """One SLEEP pass: consolidate grounded patterns into the DAG and remediate the notes. No play.
-    Gets MORE turns than a forward unit — it reads everything, writes several nodes, then prunes, so
-    a forward-unit cap (14) starved it before remediation. The attribution self-check adds `jotter
-    show` calls per causal verdict, so the wall-clock budget is wider than a forward unit's."""
+    Bounded by its GOAL (consolidate the clean patterns, leave the ambiguous ones, prune, STOP), not
+    a turn count — a hard cap once starved this pass before remediation. `timeout` (wider than a wake
+    unit's: it reads everything, writes several nodes, self-checks each causal verdict) is the only
+    backstop."""
     return _run_session(CONSOLIDATE_TASK, _BACKWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
 
 

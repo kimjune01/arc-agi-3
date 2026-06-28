@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def add(name, fn, help, args=()):
-        sp = sub.add_parser(name, help=help)
+        sp = sub.add_parser(name, help=help, description=help)  # description => shown on `arcg <cmd> --help`
         for a, kw in args:
             sp.add_argument(a, **kw)
         sp.set_defaults(fn=fn)
@@ -69,7 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
         [("x", {"type": int}), ("y", {"type": int})])
     add("undo", lambda a: l1.undo(), "undo last action (ACTION7)")
     add("actions", lambda a: l1.available(), "list the currently available actions")
-    add("look", lambda a: l1.look(no_grid=a.no_grid), "render current observation",
+    add("look", lambda a: l1.look(no_grid=a.no_grid),
+        "render current observation (EXPENSIVE: dumps the full 64x64 grid; prefer objects/diff, "
+        "which perceive compactly — reach for look at most once, when they can't answer)",
         [("--no-grid", {"action": "store_true"})])
     add("diff", lambda a: l1.diff(), "delta since last action")
     add("objects", lambda a: l1.objects(with_bg=a.with_bg,
