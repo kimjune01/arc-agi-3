@@ -1016,3 +1016,32 @@ cadence (consolidate vs act). Target ~1/3 to non-actioning compute when tuning t
 makes that third BUY something (it's spent translating novel episodes, not re-judging duplicates).
 
 2 more unit tests (eviction keeps the action log + degrades; identity-hash regression). Full suite 83.
+
+## 2026-06-28 — pragmatist confidence in dagger: certainty is never absolute, actionable is a threshold
+
+Reading [belief-is-the-edge-of-knowing](https://june.kim/belief-is-the-edge-of-knowing) resolved the
+open question from the pipe inspection (should `spend` gate on a `live` verdict?) — and the answer is
+*no*, with mechanism. The post: there is no tier above belief; "knowledge" is belief past a
+stakes-dependent action threshold, a DERIVED predicate; and *graded beliefs becoming boolean at
+consolidation* is the named failure (confident confabulation). So forcing verdicts to drain `pending`
+would have been the bug, not the fix. The sleep pass leaving graded `open/grounded` nodes is correct.
+
+Implemented the attitude into the Action DAG (`dag.py`, exported, rendered, documented in DAGGER.md):
+- `confidence(node)` = the SIZE OF ITS WITNESS SET (`len(evidence)`); `killed` → 0 (definitive
+  counterexample under determinism). An integer count, NOT a float — honors the standing "no numeric
+  credence" deferral (credence still set-adds the trial, idempotent; a witness count is the Peircean
+  security status read as a number, not a probability).
+- `actionable(node, stakes)` = `confidence ≥ threshold(stakes)` — the derived-knowledge gate applied
+  AT THE DECISION, not at consolidation. Stakes reuse the cost classes: FREE (a simmer rollout) acts
+  on any non-killed belief, even an untested dream; PAID (a real piper action) demands a witness;
+  COMMITTED (a long route) demands more. The same belief is actionable in imagination yet not for a
+  paid commit — knowledge is contextually indexed by what's at risk.
+- `dagger get/plan` now render `witnessed×N` so the graded view is legible; `open/live/killed` is
+  reframed (in DAGGER.md) as a position on a confidence continuum, not an epistemic caste (the
+  two-tier brittleness the post warns of).
+
+The consolidation pipe never gates on `actionable` (it preserves graded belief); the planner/driver
+will call it when deciding whether to commit — that's where the stakes-indexed threshold belongs, and
+where the uberty→security flow cashes out (a high-stakes plan pulls a node toward more witnesses
+before committing). 2 unit tests (confidence = witness count / killed→0; actionable as a stakes
+threshold, not a tier). Full suite 85.

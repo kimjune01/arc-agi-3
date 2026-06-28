@@ -188,6 +188,37 @@ Deferred (same ratchet): numeric credence, decay/staleness scores, any probabili
 We set-add trials and read status; a number earns its place only if prose status visibly
 fails to discriminate two live options — and then it belongs in arbor, not here.
 
+### Certainty is never absolute; "actionable" is a stakes threshold (pragmatist)
+
+Per [Belief is the edge of knowing](https://june.kim/belief-is-the-edge-of-knowing): there is **no
+tier above belief**. A node's `post` is never "true" or "false" — it carries **graded confidence**,
+and *knowledge* is a **derived predicate**: is the confidence past the action threshold for *these
+stakes*? The two-tier split (a `live` "knowledge" tier categorically above an `open` "belief" tier)
+is exactly the brittleness the post warns of — *the upper tier breaks first under contradiction*.
+So `open/live/killed` is a **position on a confidence continuum**, not an epistemic caste.
+
+Two functions implement the attitude (`confidence`, `actionable` in `dag.py`):
+
+- **`confidence(node)` = the size of its witness set** — `len(evidence)`, the distinct episodes that
+  hold it. `killed` → 0 (a definitive counterexample under determinism: act on it *never*). This is
+  an **integer count, not a probability** — it does NOT violate the "no numeric credence" deferral
+  above: credence still accrues by *set-adding the trial that held it* (idempotent), never by `++`.
+  A count of witnesses is the Peircean security status read as a number, not a float belief.
+- **`actionable(node, stakes)` = `confidence ≥ threshold(stakes)`** — the derived-knowledge gate,
+  applied **at the decision, not at consolidation** (booleanising belief at the consolidation
+  boundary is the post's *confident confabulation* failure — which is why the sleep pass leaves
+  graded `open/grounded` nodes rather than forcing verdicts). Stakes reuse the cost classes:
+  `FREE` (a simmer rollout, costs nothing) acts on *any* non-killed belief, even an untested dream
+  (uberty); `PAID` (a real piper action) demands a witness; `COMMITTED` (a long route you can't
+  cheaply undo) demands more. The *same* belief is actionable in imagination yet not for a paid
+  commit — knowledge is **contextually indexed** by what's at risk.
+
+The planner/driver calls `actionable(node, stakes)` when deciding whether to commit; the
+consolidation pipe never gates on it (it preserves and accumulates graded belief). This is where the
+uberty→security flow cashes out: the threshold *rises with stakes*, so a high-stakes plan pulls a
+node toward more witnesses (more inductive grounding) before it will commit — Peirce's economy of
+research, priced at the decision.
+
 ### Resolving uncertainty: surprise-driven, not champion/challenger A/B
 
 The obvious way to resolve decomposition uncertainty is **champion/challenger**: hold a

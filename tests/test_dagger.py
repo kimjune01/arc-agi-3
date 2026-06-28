@@ -147,3 +147,32 @@ def test_render_lists_the_graph():
     dg.init(c, ["ACTION1"])
     md = dg.render(c)
     assert md.startswith("# dagger graph") and "win-game" in md and "ACTION1" in md
+
+
+def test_confidence_is_the_witness_set_size_killed_is_zero():
+    """Graded, idempotent confidence = number of distinct witnessing episodes; never a float. An
+    untested dream is 0; a killed node is 0 (definitive counterexample, act on it never)."""
+    dream = dg.Node(anchor="d", post="maybe", children=("ACTION1", "ACTION2"), mode="conjunction")
+    grounded = dg.Node(anchor="g", post="rigid body", children=("ACTION1",), mode="sequence",
+                       status="open", evidence=("0", "1", "7"))
+    killed = dg.Node(anchor="k", post="blocked when c9 adjacent", children=("ACTION1",),
+                     mode="sequence", status="killed", evidence=("b765", "5695"))
+    assert dg.confidence(dream) == 0                          # pure uberty, no witness
+    assert dg.confidence(grounded) == 3                       # witnessed×3
+    assert dg.confidence(killed) == 0                         # falsified → zero, despite its evidence
+
+
+def test_actionable_is_a_stakes_threshold_not_a_tier():
+    """'Knowledge' is derived: confidence past the stakes-indexed line. The SAME belief is
+    actionable for free (a simmer rollout) yet not for a paid commit."""
+    dream = dg.Node(anchor="d", post="maybe", children=("ACTION1",), mode="sequence")  # 0 witnesses
+    witnessed = dg.Node(anchor="w", post="moves 5", children=("ACTION1",), mode="sequence",
+                        status="open", evidence=("0",))                                  # 1 witness
+    killed = dg.Node(anchor="k", post="no", children=("ACTION1",), mode="sequence",
+                     status="killed", evidence=("0", "1"))
+
+    assert dg.actionable(dream, dg.FREE)                      # imagination acts on an untested guess
+    assert not dg.actionable(dream, dg.PAID)                  # but won't spend real budget on it
+    assert dg.actionable(witnessed, dg.PAID)                  # one witness clears a paid action
+    assert not dg.actionable(witnessed, dg.COMMITTED)         # ...but not a long committed route
+    assert not dg.actionable(killed, dg.FREE)                 # killed is never actionable, any stakes

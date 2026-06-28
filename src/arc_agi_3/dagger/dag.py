@@ -142,6 +142,35 @@ def entails(post: str, pre: str) -> bool:
     return _norm(post) == _norm(pre)
 
 
+# --- pragmatist confidence: certainty is never absolute; "actionable" is a stakes threshold -------
+# (belief-is-the-edge-of-knowing). A node's post is never "true"/"false" — it carries GRADED
+# confidence = how many distinct episodes witness it, and KNOWLEDGE is a DERIVED predicate: is the
+# confidence past the action threshold for THESE stakes? There is no live/killed *tier* above belief
+# (that two-tier split is the brittleness the post warns of); `status` is a position on the
+# continuum, and the threshold lives at the decision, not at consolidation.
+FREE, PAID, COMMITTED = "free", "paid", "committed"
+_STAKES = {FREE: 0, PAID: 1, COMMITTED: 2}        # witnesses an action AT THESE STAKES demands
+
+
+def confidence(node: Node) -> int:
+    """Graded confidence in `node`'s post = the SIZE OF ITS WITNESS SET (distinct grounding
+    episodes). Idempotent and integer, NOT a float — credence accrues by set-adding the trial that
+    held it, never `++` (that breaks the cache law; DAGGER.md). `killed` is 0: a definitive
+    counterexample (determinism) drops confidence in the post to zero — you act on it never."""
+    return 0 if node.status == "killed" else len(node.evidence)
+
+
+def actionable(node: Node, stakes: str = PAID) -> bool:
+    """The DERIVED-knowledge predicate (pragmatist): is `node` witnessed ENOUGH to act on AT THESE
+    STAKES? `confidence >= threshold(stakes)`. There is no absolute 'known' — 'actionable' is the
+    stakes-indexed line a belief crosses. FREE (a simmer rollout, costs nothing) acts on any
+    non-killed belief — even an untested dream (uberty); PAID (a real piper action) demands a
+    witness; COMMITTED (a long route you can't cheaply undo) demands more. Killed: never."""
+    if node.status == "killed":
+        return False
+    return confidence(node) >= _STAKES.get(stakes, _STAKES[PAID])
+
+
 def plan(conn, goal: str):
     """JIT: return a cached, non-killed compound node whose `post` matches `goal` (a hit), else a
     HOLE to abduce. Match uses the matcher stub, so only an exact prior decomposition hits today."""

@@ -19,7 +19,9 @@ from . import dag
 
 def _fmt(n) -> str:
     body = f"action {n.action}" if n.is_leaf else f"{n.mode}: {' ; '.join(n.children) or '(none)'}"
-    prov = "" if n.is_leaf else f", {n.provenance}"
+    # graded confidence (witness-set size) makes the pragmatist view legible: never absolute,
+    # `killed`→0, and "actionable" is a stakes threshold the driver applies on top.
+    prov = "" if n.is_leaf else f", {n.provenance}, witnessed×{dag.confidence(n)}"
     ev = f"  evidence={list(n.evidence)}" if n.evidence else ""
     return f"  {n.ref()}  [{n.kind}, {n.status}{prov}]  post={n.post!r}  {body}{ev}"
 

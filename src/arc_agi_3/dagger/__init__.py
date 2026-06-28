@@ -8,10 +8,15 @@ and the two named holes (the matcher, the belief schema) live in DAGGER.md §int
 """
 
 from .dag import (
+    COMMITTED,
+    FREE,
+    PAID,
     WIN,
     WIN_ANCHOR,
     Hole,
     Node,
+    actionable,
+    confidence,
     connect,
     decompose,
     entails,
@@ -25,6 +30,7 @@ from .dag import (
 )
 
 __all__ = [
-    "WIN", "WIN_ANCHOR", "Hole", "Node",
-    "connect", "decompose", "entails", "get", "init", "live", "merge", "plan", "put", "render",
+    "WIN", "WIN_ANCHOR", "FREE", "PAID", "COMMITTED", "Hole", "Node",
+    "actionable", "confidence", "connect", "decompose", "entails", "get", "init", "live",
+    "merge", "plan", "put", "render",
 ]
