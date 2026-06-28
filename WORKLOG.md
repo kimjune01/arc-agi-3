@@ -876,3 +876,41 @@ the specifics (layer 3).
 
 New tests pin all of it (light/goal-based maps; wake+sleep allowlists grant what their maps name;
 no `--max-turns` by default; `dagger decompose --help` carries the discipline). Full suite 76.
+
+## 2026-06-28 — simmer back in the loop; wake = attempt, not finding (+ tentative cadence plan)
+
+Two corrections from watching the validation runs, plus a tentative roadmap note (below).
+
+**simmer was locked out of the reasoner — a third of the architecture missing.** The wake/sleep
+allowlists granted arcg/jotter/dagger but not `simmer`, so the wake pass could only learn by
+spending REAL budget — the model-based core ("plan in simmer free, commit in piper paid") was
+severed. Wired `simmer:*` into both allowlists and named it in both maps: the wake map now leads
+with PREDICT-in-simmer-then-spend-only-where-blind; the sleep map uses `simmer test` to avoid
+promoting a mechanic the engine can't reproduce. Gave simmer a no-args driving-contract so its
+`--help` is healthy like the others. (Aside: profiled the "where does wall-clock go" worry — NOT
+simmer, 0 calls and not imported on that path; it's LLM turn-latency × calls, `uv run` startup is
+~0.2s. The map-only prompts add a few `--help` round-trips, the deliberate progressive-disclosure
+trade.)
+
+**The wake pass was over-optimizing for a clean finding, so it never attempted.** Live: with no
+hard cap it timed out at 300s spent 0 (dithering); adding a finding-based self-stop fixed the
+timeout (completes ~15 turns) but it STILL spent 0 — it recorded something off existing memory and
+stopped without acting. Root reframe (the load-bearing one): **a wake unit's bar is an ATTEMPT,
+not a consolidate-worthy result.** Predict → spend ONE real action on the frontier → record the
+episode → STOP. An inconclusive/messy episode is fine; the sleep pass sorts epmem into pmem and
+leaves the ambiguous ones. **epmem ACCUMULATING is expected and OK** — the paid action and its
+recorded episode ARE the unit's product, not a polished finding. The self-stop is now keyed on
+"made your attempt?" not "found something novel?". (The sleep pass already validated clean: it
+deferred the ambiguous `lateral-drag-c9` as an `open` `no-external-c9-drag` dream instead of
+forcing — the leave-ambiguous discipline working.)
+
+**Tentative / not built (roadmap, do NOT treat as decided):**
+- *Demand-driven consolidation cadence.* Replace the fixed `run()` schedule (N wake units, then 1
+  sleep) with a threshold trigger: wake cycles accumulate epmem, and a sleep pass fires when epmem
+  crosses a threshold (corpus size / novel-episode count / a surprise budget). "epmem accumulating
+  is OK" is exactly the precondition that makes batching-then-consolidating sensible. Seam: the
+  `run()` loop's cadence logic only; the modules below don't move.
+- *Multiple hypotheses per wake cycle.* Today a wake unit yields after ONE attempt; a future tuning
+  may let it run several attempts before yielding, then consolidate the batch. Seam: the trigger
+  metric (what counts toward the threshold) + whether a unit yields after one attempt or many.
+  All tentative — flagged here so the direction isn't lost, not committed to.

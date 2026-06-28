@@ -87,9 +87,24 @@ def predict_cmd(action: str, x, y, show_grid: bool) -> str:
     return out
 
 
+_CONTRACT = """\
+simmer — the FREE deduction engine (the imagination half of the piper/simmer pair).
+
+The model-based core is: plan in simmer (free, approximate), commit in piper/arcg (real, budget),
+reconcile by diffing. The WAKE pass predicts an action here before spending a real one; the SLEEP
+pass checks the engine reproduces the corpus before promoting a mechanic.
+
+  predict <action>      predict an action's effect on the CURRENT grid, FREE, before paying for it
+  test                  replay the whole corpus through the engine; a MISS localizes a model gap
+  step <index>          one corpus transition: predicted grid vs reality
+
+Pull specifics from `simmer <cmd> --help`. Corpus is $ARCG_STATE_DIR/transitions.jsonl (piper writes it)."""
+
+
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="simmer", description="Functional sim engine — differential test vs piper.")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    p = argparse.ArgumentParser(prog="simmer", description="Functional sim engine — differential test vs piper.",
+                                epilog=_CONTRACT, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd")
     t = sub.add_parser("test", help="replay the corpus through step; report reproduced/missed")
     t.add_argument("--corpus", type=str, default=None)
     t.set_defaults(fn=lambda a: test(_corpus(a)))
@@ -114,6 +129,9 @@ def _corpus(a):
 
 def main() -> None:
     args = build_parser().parse_args()
+    if args.cmd is None:                 # no-args: print the driving-contract (progressive disclosure)
+        print(_CONTRACT)
+        return
     print(args.fn(args))
 
 

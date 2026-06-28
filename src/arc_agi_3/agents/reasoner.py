@@ -35,11 +35,13 @@ MEMORY_FILES = ("notes.md", "transitions.jsonl", "graph.db")
 #   BACKWARD (sleep/consolidate) reads everything and WRITES dagger (decompose); it never plays
 #     (no `arcg act` — only `arcg note`/`notes`).
 _FORWARD_ALLOWED = ["Bash(uv run arcg:*)", "Bash(uv run jotter:*)",
+                    "Bash(uv run simmer:*)",                            # FREE rollout (predict before spending)
                     "Bash(uv run dagger render:*)", "Bash(uv run dagger plan:*)",
                     "Bash(uv run dagger get:*)"]
 _BACKWARD_ALLOWED = ["Bash(uv run arcg notes:*)", "Bash(uv run arcg note:*)",
                      "Bash(uv run arcg forget:*)",
-                     "Bash(uv run jotter:*)", "Bash(uv run dagger:*)"]
+                     "Bash(uv run jotter:*)", "Bash(uv run simmer:*)",  # test the engine vs the corpus
+                     "Bash(uv run dagger:*)"]
 
 
 def _restore_checkpoint(src: Path) -> int:
@@ -68,20 +70,32 @@ game already in progress (the harness owns its lifecycle — do NOT start/end it
 about the rules; learn only by acting and watching what changes. You are a FRESH session — your \
 memory is on disk, so re-hydrate before acting.
 
-GOAL: grow episodic memory by ONE new grounded finding the next session inherits. Not a higher \
-score — score moving is only a SIGNAL to learn from. Pick the single question that most reduces \
-your uncertainty (what does an action do? is any a no-op? what moves the score?); once the basic \
-moves are mapped, the frontier is the CONSTRAINTS — drive into walls and edges, because a BLOCKED \
-move is as much a finding as one that moves. Spend the FEWEST real actions to settle it, record \
-it, then STOP. Inspection is free; acting costs budget.
+GOAL: make ONE ATTEMPT that grows episodic memory. Pick your best current question (what does an \
+action do? is any a no-op? what moves the score? once the moves are mapped, drive into walls and \
+edges — a BLOCKED move is as much an episode as one that moves), spend ONE real action to test it, \
+and record what happened. You do NOT need a clean, consolidate-worthy result: an inconclusive or \
+messy episode is fine — the SLEEP pass sorts epmem into pmem and leaves the ambiguous ones. \
+Episodic memory ACCUMULATING is expected and OK; your job is the ATTEMPT, not a polished finding. \
+Score moving is only a signal to learn from.
+
+Inspection is free, and so is `simmer predict` — a FREE rollout of an action's effect on the \
+current grid (deduction). PREDICT in simmer first; spend the REAL `arcg act` (budget) to actually \
+make the attempt — that paid action, and the episode it records, IS the unit's product. That is \
+the model-based core: plan in simmer, commit in piper.
+
+SELF-STOP (the bound is your goal, not a turn count): once you've made your attempt — acted and \
+recorded what happened — STOP. Don't hunt for a perfect question or a cleaner finding, and don't \
+re-inspect memory you've already read; that is how a unit burns to timeout. Re-hydrate ONCE, make \
+your attempt, record, stop.
 
 Tools — run `uv run <tool> ...` from the repo root; pull specifics from `<tool> --help`:
   arcg    actions | objects | diff | act | note — available actions; perceive; ACT (costs budget); record a finding
+  simmer  predict — FREE: predict an action's effect on the current grid BEFORE spending a real one
   jotter  stats | effects | diff | trace — the grounded record; recover an action's effect WITHOUT re-spending
   dagger  render | plan — READ the plan graph the sleep pass built (you only read it)
 
-Re-hydrate (`arcg notes`, `jotter trace`, `dagger render`, `arcg objects`), answer your one \
-question with minimal actions, `arcg note` the finding, then STOP."""
+Re-hydrate (`arcg notes`, `jotter trace`, `dagger render`, `arcg objects`), predict in simmer, \
+spend a real action only where simmer is untrustworthy, `arcg note` the finding, then STOP."""
 
 
 CONSOLIDATE_TASK = """You are the SLEEP pass of an agent learning ARC-AGI-3. You do NOT play \
@@ -97,6 +111,8 @@ STOP. If nothing is cleanly groundable yet, say so and STOP.
 Tools — run `uv run <tool> ...` from the repo root; pull specifics from `<tool> --help`:
   arcg    notes | forget | note — read the prose findings; prune captured ones; record a one-line summary
   jotter  trace | diff | show — the grounded, PERMANENT record (the evidence you cite; never prune it)
+  simmer  test — replay the corpus through the engine; a MISS localizes where the model is wrong (don't \
+promote a mechanic the engine can't reproduce)
   dagger  render | decompose — the plan graph; write/promote a node. `dagger decompose --help` IS the \
 discipline: what a verdict must cite, and when to leave a node open.
 

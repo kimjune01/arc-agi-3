@@ -28,7 +28,7 @@ def _instructed_cmds(task: str) -> set[str]:
     writes them both fully (`uv run arcg forget`) and bare (`arcg notes` in the re-hydrate list),
     so the `uv run` prefix is optional."""
     return {f"uv run {tool} {sub}"
-            for tool, sub in re.findall(r"(?:uv run )?(arcg|jotter|dagger) (\w+)", task)}
+            for tool, sub in re.findall(r"(?:uv run )?(arcg|jotter|simmer|dagger) (\w+)", task)}
 
 
 def test_consolidate_pass_may_read_the_commands_it_is_told_to():
@@ -45,6 +45,16 @@ def test_wake_commands_are_permitted_too():
         assert _permitted(cmd, reasoner._FORWARD_ALLOWED), f"wake pass can't run: {cmd}"
 
 
+def test_simmer_is_available_to_both_passes():
+    """simmer is the FREE deduction third of the architecture: the wake pass predicts in it before
+    spending a real action (plan in simmer, commit in piper), the sleep pass tests the engine vs the
+    corpus. Both maps must name it and both allowlists must grant it — locking it out forces every
+    hypothesis onto real budget."""
+    assert "simmer" in reasoner.FORWARD_TASK and "simmer" in reasoner.CONSOLIDATE_TASK
+    assert _permitted("uv run simmer predict", reasoner._FORWARD_ALLOWED)
+    assert _permitted("uv run simmer test", reasoner._BACKWARD_ALLOWED)
+
+
 def test_prompts_are_light_goal_based_maps():
     """Progressive disclosure: each role-scoped prompt is a MAP that defers specifics to `--help`,
     bounded by its GOAL — not a manual, and not a hard turn-count cap."""
@@ -53,7 +63,17 @@ def test_prompts_are_light_goal_based_maps():
         assert "GOAL" in task and "STOP" in task       # goal-based, self-terminating
         assert "tool calls" not in task                # no hard-coded turn cap in the prompt
         assert not re.search(r"~?\d+\s+tool", task)
-        assert len(task.splitlines()) < 20             # a map, not a manual
+        assert len(task.splitlines()) < 24             # a map, not a manual
+
+
+def test_wake_map_has_a_soft_self_stop_forcing_function():
+    """With no hard turn cap, the wake pass must self-terminate at its goal — without a forcing
+    function it re-inspects memory until the wall-clock timeout (observed: both wake units timed out
+    at 0 actions). The bound is the ATTEMPT: act once, record the episode, STOP — not a polished
+    finding (over-optimizing for a clean result is what made it dither). epmem may accumulate."""
+    assert "SELF-STOP" in reasoner.FORWARD_TASK
+    assert "ATTEMPT" in reasoner.FORWARD_TASK            # the bound is one attempt, not a count
+    assert "ACCUMULATING" in reasoner.FORWARD_TASK       # an episode need not consolidate this cycle
 
 
 def test_no_hard_turn_cap_by_default():
