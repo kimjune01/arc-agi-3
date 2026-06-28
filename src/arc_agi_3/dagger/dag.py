@@ -17,6 +17,13 @@ from ..session import STATE_DIR
 
 WIN = "win game"        # the apex goal predicate (prose)
 WIN_ANCHOR = "win-game"  # the apex's authored anchor
+# The per-level subgoal the apex repeats. The PROTOCOL guarantees this spine (verified vs the
+# OpenAPI FrameResponse: `levels_completed` is cumulative, `win_levels` the threshold, identical for
+# every game), so winning = reach win_levels by completing one level at a time. Unlike a generic
+# game, this win-down HEAD is not abduced JIT — it is pre-baked at init. Only the per-level BODY (the
+# recipe that actually scores) is grown JIT, under this anchor (a MISS until the agent learns it).
+DEPOSIT_ANCHOR = "deposit-one-point"
+DEPOSIT_POST = "complete one level (levels_completed += 1)"
 _MODES = ("sequence", "conjunction")
 _VERDICTS = ("live", "killed")  # an ASSERTED outcome (vs `open` = a dream/hypothesis)
 
@@ -106,9 +113,16 @@ def connect(path=None):
 
 
 def init(conn, actions):
-    """Seed the DAG: apex `win game` (open, undecomposed) + one leaf per primitive action. Fully
-    determined — the leaf's anchor is the action token. `actions` = the frame's available_actions."""
-    put(conn, Node(anchor=WIN_ANCHOR, post=WIN))
+    """Seed the DAG with its boundaries AND the pre-baked win-down spine. `actions` = the frame's
+    available_actions. Fully determined — no freedom:
+      - apex `win-game` (post WIN, open), decomposed into the per-level `deposit-one-point`. This
+        spine is PROTOCOL-GUARANTEED (see DEPOSIT_*), so it is baked here, not abduced JIT.
+      - one leaf per primitive action (effect still open).
+    `deposit-one-point` itself is NOT seeded — it is a JIT MISS (a HOLE), grown when the agent learns
+    the per-level recipe (its children = the act-up nodes that score). The apex stays `open`: the
+    spine is structural, but confidence accrues only on the witnessed BODY beneath it."""
+    put(conn, Node(anchor=WIN_ANCHOR, post=WIN, children=(DEPOSIT_ANCHOR,), mode="sequence",
+                   pre="repeat deposit-one-point until levels_completed == win_levels"))
     for a in actions:
         put(conn, Node(anchor=a, action=a))      # a primitive leaf (effect still open)
     return conn
@@ -244,10 +258,11 @@ def decompose(conn, anchor: str, goal: str, children, mode: str, status: str = "
         ("blocked WHEN colour-9 adjacent") from being written with zero grounding."""
     if anchor == WIN_ANCHOR:
         raise ValueError(
-            f"dagger: {WIN_ANCHOR!r} is the seeded apex (the root goal), not an authorable node. "
-            f"A decomposition of winning is authored under its OWN anchor with post {WIN!r} "
-            f'(matched by `entails`), e.g. `decompose win-recipe "win game" ACTION1 ...`. A dead '
-            f"end is a separate killed node, never the apex itself.")
+            f"dagger: {WIN_ANCHOR!r} is the seeded apex (the root goal), not an authorable node — and "
+            f"its win-down spine is pre-baked (it already decomposes into {DEPOSIT_ANCHOR!r}). Author "
+            f"the per-level RECIPE under {DEPOSIT_ANCHOR!r} with post {DEPOSIT_POST!r}, e.g. "
+            f'`decompose {DEPOSIT_ANCHOR} "{DEPOSIT_POST}" collect-token route-to-lock overlap-lock`. '
+            f"A dead end is a separate killed node, never the apex itself.")
     if mode not in _MODES:
         raise ValueError(f"dagger: mode must be one of {_MODES}, got {mode!r}")
     evidence = tuple(dict.fromkeys(e.strip() for e in evidence if e and e.strip()))  # dedup, drop blanks

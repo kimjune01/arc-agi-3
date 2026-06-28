@@ -19,18 +19,24 @@ def test_init_seeds_apex_and_one_leaf_per_action():
     c = _conn()
     dg.init(c, ["ACTION1", "ACTION2", "ACTION6"])
     rows = db.nodes(c)
-    assert len(rows) == 4                                  # apex + 3 leaves, determined
-    assert dg.get(c, "dagger:win-game").post == dg.WIN
+    assert len(rows) == 4                                  # apex + 3 leaves (deposit is a JIT miss)
+    apex = dg.get(c, "dagger:win-game")
+    assert apex.post == dg.WIN
+    assert apex.children == (dg.DEPOSIT_ANCHOR,)           # win-down spine pre-baked at init
+    assert dg.get(c, dg.DEPOSIT_ANCHOR) is None            # the per-level BODY stays a HOLE
     leaves = [r for r in rows if r["kind"] == "leaf"]
     assert sorted(r["action"] for r in leaves) == ["ACTION1", "ACTION2", "ACTION6"]
 
 
-def test_plan_misses_to_hole_then_hits_after_decompose():
+def test_apex_spine_prebaked_body_is_jit():
     c = _conn()
     dg.init(c, ["ACTION1"])
-    assert isinstance(dg.plan(c, "win game"), dg.Hole)     # apex undecomposed -> JIT miss
-    dg.decompose(c, "win-recipe", "win game", ["ACTION1"], "sequence")
-    assert isinstance(dg.plan(c, "WIN  GAME"), dg.Node)    # normalized exact hit
+    apex = dg.plan(c, "win game")
+    assert isinstance(apex, dg.Node)                       # apex HITS: spine baked (win = repeat deposit)
+    assert apex.children == (dg.DEPOSIT_ANCHOR,)
+    assert isinstance(dg.plan(c, dg.DEPOSIT_POST), dg.Hole)   # the BODY is the JIT miss now
+    dg.decompose(c, dg.DEPOSIT_ANCHOR, dg.DEPOSIT_POST, ["ACTION1"], "sequence")
+    assert isinstance(dg.plan(c, dg.DEPOSIT_POST), dg.Node)   # body grown -> hit
 
 
 def test_put_idempotent_and_get_resolves_ref():
@@ -116,10 +122,12 @@ def test_apex_is_unkillable_the_root_goal_stays_reachable():
     with pytest.raises(ValueError):                           # nor any direct put off `open`
         dg.put(c, dg.Node(anchor=dg.WIN_ANCHOR, post=dg.WIN, status="killed"))
     assert dg.get(c, "dagger:win-game").status == "open"      # apex untouched
-    assert isinstance(dg.plan(c, "win game"), dg.Hole)        # winning is still plannable (a HOLE, not killed-away)
-    # a real win recipe lives under its OWN anchor, matched on the post text
-    dg.decompose(c, "win-recipe", "win game", ["ACTION1"], "sequence", status="live", evidence=["0"])
+    # winning stays plannable: the apex (with its pre-baked spine) is a HIT, never killed-away
     assert isinstance(dg.plan(c, "win game"), dg.Node)
+    # the per-level recipe lives under deposit-one-point (the spine's body), matched on its post
+    dg.decompose(c, dg.DEPOSIT_ANCHOR, dg.DEPOSIT_POST, ["ACTION1"], "sequence", status="live",
+                 evidence=["0"])
+    assert isinstance(dg.plan(c, dg.DEPOSIT_POST), dg.Node)
 
 
 def test_promotion_carries_evidence_dream_then_ground():

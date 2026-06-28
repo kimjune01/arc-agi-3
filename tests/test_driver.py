@@ -56,10 +56,12 @@ def test_run_drives_through_the_gated_path(game):
     assert s["steps"] == 4 and s["spent"] == 4        # spent the budget through the gates
     assert game.calls == 4                             # every step reached the (fake) API
     assert len(result["log"]) == 4
-    # init seeded the dagger graph with real leaves + the apex
+    # init seeded the dagger graph with real leaves + the apex (now with the pre-baked spine)
     assert db.get(conn, "win-game") is not None
     assert db.get(conn, "ACTION1") is not None
-    assert all(e["plan"] == "Hole" for e in result["log"])   # no decomposition cached yet
+    # the apex spine is pre-baked (plan HITS it), but the per-level BODY isn't witnessed, so the
+    # driver never exploits — every step is explore (the spend that earns witnesses).
+    assert all(e["mode"] == "explore" for e in result["log"])
 
 
 def test_decide_returns_a_real_available_action(game):
@@ -78,10 +80,12 @@ def test_decide_exploits_a_goal_plan_witnessed_enough_to_commit(game):
     sess = store.load()
     conn = db.connect(":memory:")
     dg.init(conn, ["ACTION1", "ACTION2", "ACTION3", "ACTION4"])
-    dg.decompose(conn, "win-recipe", dg.WIN, ["ACTION1"], "sequence", status="open",
+    # the recipe is the per-level BODY under the pre-baked spine (deposit-one-point), witnessed×2
+    dg.decompose(conn, dg.DEPOSIT_ANCHOR, dg.DEPOSIT_POST, ["ACTION1"], "sequence", status="open",
                  evidence=["0", "1"])                  # witnessed×2 → actionable at COMMITTED
     action, info = driver.decide(sess, counts={}, conn=conn, goal=dg.WIN)
-    assert info["mode"] == "exploit" and info["node"] == "win-recipe"
+    # decide descends the structural apex to the witnessed body and commits IT
+    assert info["mode"] == "exploit" and info["node"] == dg.DEPOSIT_ANCHOR
     assert action == "ACTION1"
 
 
@@ -93,7 +97,7 @@ def test_decide_will_not_commit_an_under_witnessed_plan(game):
     sess = store.load()
     conn = db.connect(":memory:")
     dg.init(conn, ["ACTION1", "ACTION2", "ACTION3", "ACTION4"])
-    dg.decompose(conn, "win-recipe", dg.WIN, ["ACTION1"], "sequence", status="open",
+    dg.decompose(conn, dg.DEPOSIT_ANCHOR, dg.DEPOSIT_POST, ["ACTION1"], "sequence", status="open",
                  evidence=["0"])                       # only ×1 < COMMITTED threshold
     action, info = driver.decide(sess, counts={}, conn=conn, goal=dg.WIN)
     assert info["mode"] == "explore"

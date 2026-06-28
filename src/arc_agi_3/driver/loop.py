@@ -76,6 +76,29 @@ def _next_primitive(conn, node, avail, counts, _seen=None):
     return min(runnable, key=lambda a: (counts.get(a, 0), a)) if runnable else None
 
 
+def _committed_action(conn, node, stakes, avail, counts, _seen=None):
+    """Find the action to EXPLOIT: descend to the shallowest decomposition that is `actionable` at
+    `stakes` AND resolves to a runnable primitive; return (action, node) or (None, None).
+
+    The apex's win-down spine is PRE-BAKED, so it is always present but STRUCTURAL — confidence 0,
+    never actionable. Exploitation must therefore fire on the witnessed BODY beneath it (the per-level
+    recipe under `deposit-one-point`), not on the apex. So we skip non-actionable nodes and recurse
+    into their children until a witnessed-enough recipe is found."""
+    _seen = _seen or set()
+    if node is None or node.anchor in _seen:
+        return None, None
+    _seen.add(node.anchor)
+    if dagger.actionable(node, stakes):
+        a = _next_primitive(conn, node, avail, counts)
+        if a is not None:
+            return a, node
+    for child in node.children:                       # apex/structural node: look below it
+        a, n = _committed_action(conn, dagger.get(conn, child), stakes, avail, counts, _seen)
+        if a is not None:
+            return a, n
+    return None, None
+
+
 def decide(sess, counts: dict, *, conn=None, goal: str = dagger.WIN, corpus=None) -> tuple[str, dict]:
     """Pick the next paid action and say WHY (the `info` dict: mode, and the node when exploiting).
 
@@ -93,14 +116,16 @@ def decide(sess, counts: dict, *, conn=None, goal: str = dagger.WIN, corpus=None
     before = np.asarray(sess.grid, np.int16)
     avail0 = [a for a in (sess.available_actions or _DEFAULT_ACTIONS) if a != "ACTION6"]
 
-    # EXPLOIT: a goal-plan that is witnessed enough to commit at COMMITTED stakes (the high-stakes
-    # threshold for a route). Below the bar, fall through to EXPLORE — the spend that earns witnesses.
+    # EXPLOIT: a goal-plan whose BODY is witnessed enough to commit at COMMITTED stakes (the
+    # high-stakes threshold for a route). The apex spine is pre-baked but structural (confidence 0),
+    # so the gate descends past it to the witnessed recipe; below the bar, fall through to EXPLORE —
+    # the spend that earns witnesses.
     if conn is not None:
         plan = dagger.plan(conn, goal)
-        if isinstance(plan, dagger.Node) and dagger.actionable(plan, dagger.COMMITTED):
-            a = _next_primitive(conn, plan, avail0, counts)
+        if isinstance(plan, dagger.Node):
+            a, node = _committed_action(conn, plan, dagger.COMMITTED, avail0, counts)
             if a is not None:
-                return a, {"mode": "exploit", "node": plan.anchor, "sim_move": True}
+                return a, {"mode": "exploit", "node": node.anchor, "sim_move": True}
     # EXPLORE (no plan cleared the bar): probe to witness. ACTION6 (click) needs a coordinate
     # target we don't choose yet — skip it in the skeleton.
     avail = avail0

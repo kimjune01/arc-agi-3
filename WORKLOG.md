@@ -1200,3 +1200,32 @@ The lookup surfaced obvious gaps; fixed with failing-tests-first (tests/test_str
   win_levels (read, never hard-code).
 
 Suite 87 -> 91. No behavior change beyond not crashing on NOT_STARTED and stopping on it.
+
+## 2026-06-28 — pre-bake the win-down apex at init (the protocol guarantees the spine)
+
+Since the score signal is verified universal (prev entry), the win-down HEAD is no longer something
+to abduce JIT — it's protocol-given, so bake it at init. `dagger init` now seeds the apex `win-game`
+ALREADY decomposed into the per-level subgoal `deposit-one-point` (post "complete one level /
+levels_completed += 1"), a deliberate exception to DAGGER.md's "apex born childless, decomposition
+grown JIT". Only the per-level BODY (the recipe that scores) stays a JIT MISS under that anchor —
+that's the one game-specific part. New constants `DEPOSIT_ANCHOR`/`DEPOSIT_POST` (exported).
+
+The ripple that needed care: pre-baking makes `plan(WIN)` always a HIT (the apex), and the exploit
+gate checked `actionable` on that TOP node — which is structural (confidence 0, no evidence), so it
+would NEVER commit. Fixed by moving the gate DOWN: new `_committed_action` descends past the
+structural apex to the shallowest node that is `actionable` at COMMITTED and resolves to a runnable
+primitive — i.e. you commit to a route when the RECIPE (the witnessed body) clears the bar, not the
+(always-certain) apex. This is the more correct reading of the pragmatist gate anyway.
+
+- dag.py: init bakes the spine; decompose's apex-guard message now points per-level recipes at
+  `deposit-one-point` (post DEPOSIT_POST), e.g. `decompose deposit-one-point "<post>" collect-token
+  route-to-lock overlap-lock`.
+- driver/loop.py: `_committed_action` + exploit block descends to the witnessed body.
+- DAGGER.md §"The initial DAG" rewritten (two boundaries + the protocol-baked rung; exploitation
+  descends past the structural apex).
+- Tests updated to the new model (apex HITS, body is the JIT miss; recipe authored under
+  deposit-one-point; commit fires on the witnessed body). Suite 91 (was 91; 2 dagger + 3 driver
+  tests rewritten, not added).
+- Re-baked checkpoints/ls20-firstpoint: dropped the stale childless apex, re-seeded the spine; the
+  live overlap-lock/collect-token preserved — so the next sleep pass authors the recipe UNDER the
+  baked deposit-one-point.

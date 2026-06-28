@@ -28,21 +28,31 @@ morphism" and the correctness condition for a decomposition stops being vague ("
 should accomplish the goal") and becomes a single mechanical check — *does the diagram
 commute*.
 
-## The initial DAG: prepopulated with its two boundaries, nothing between
+## The initial DAG: two boundaries plus the protocol-baked win-down spine
 
-The DAG is born with **exactly its two roots and no middle**:
+The DAG is born with its **two roots and the one rung the protocol guarantees**:
 
-- **apex:** one childless compound node, **`win game`** — the goal. Childless = undecomposed; its
-  decomposition is grown JIT/abductively (win-down regresses it into subgoals on miss), never
-  authored up front.
+- **apex:** one compound node, **`win game`**, **pre-decomposed at init** into the per-level subgoal
+  **`deposit-one-point`** (`post: complete one level / levels_completed += 1`). This is a deliberate
+  exception to "grow the decomposition JIT": ARC-AGI-3's win mechanism is *not game-specific* —
+  verified against the OpenAPI `FrameResponse`, every game reports `levels_completed` (cumulative)
+  and `win_levels` (the threshold), so winning is *always* "reach `win_levels` by completing one
+  level at a time." That win-down HEAD is therefore baked at init, not abduced. (The apex stays
+  `open`: the spine is structural, so its confidence is 0 until the BODY beneath it is witnessed.)
 - **base:** one **leaf node per primitive input** the game exposes — its action alphabet
   (`ACTION1`…`ACTION7`, or whatever the frame's `available_actions` reports). These are the only
   things the agent can actually *do*; act-up composes from them.
 
-Everything in between — the subgoal decomposition descending from `win game`, the composed
-reachable-state nodes ascending from the primitives — is **emergent**, grown on demand where the
-two roots meet (see §the-two-roots). So the DAG's *boundary conditions* are fixed and its bulk is
-learned.
+`deposit-one-point` itself is **not** seeded — it is a JIT **miss** (a HOLE). Its body, the per-level
+recipe that actually scores (e.g. `collect-token ; route-to lock ; overlap-lock`), is the *only*
+game-specific part, grown on demand under that anchor. So everything between the baked spine and the
+primitives — that recipe, and the composed reachable-state nodes ascending from the leaves — stays
+**emergent**, grown where the two roots meet (see §the-two-roots). Boundary conditions AND the
+universal win rung are fixed; the per-game bulk is learned.
+
+Consequence for exploitation: because the apex is structural (confidence 0, never `actionable`), the
+driver's commit gate descends *past* it to the witnessed body — you commit to a route when the
+**recipe** is witnessed enough, not when the (always-certain) apex is.
 
 This is also what makes the [dual-provenance invariant](PLAN.md) (every action points to an
 action node and a hypothesis node) satisfiable from move 0: the **action-node leaves already
