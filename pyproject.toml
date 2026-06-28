@@ -3,7 +3,7 @@ name = "arc-agi-3"
 version = "0.1.0"
 description = "An agent that plays the ARC-AGI-3 interactive reasoning benchmark."
 readme = "README.md"
-license = "GPL-3.0-only"
+license = "AGPL-3.0-only"
 authors = [
     { name = "June", email = "kimjune01@gmail.com" }
 ]

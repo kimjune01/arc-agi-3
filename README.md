@@ -66,6 +66,6 @@ uv run arc3 --agent claude --game ls20   # programmatic Claude policy (JSON in/o
 
 Dual, by kind:
 
-- **Code** — [GPL-3.0](./LICENSE).
+- **Code** — [AGPL-3.0](./LICENSE): network use is distribution (§13).
 - **Prose & docs** (`*.md`) — [CC BY-SA-NS](./LICENSE-CONTENT.md): CC BY-SA 4.0
-  plus a Network Services clause (the AGPL idea, for prose).
+  plus a Network Services clause — the same network-copyleft, for prose.
