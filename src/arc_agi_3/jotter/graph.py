@@ -76,13 +76,25 @@ def state_hash(grid, counter=frozenset()) -> str:
     return hashlib.sha1(arr.tobytes()).hexdigest()[:10]
 
 
+def is_stub(row: dict) -> bool:
+    """An EVICTED transition: its grids were dropped (compression), leaving the action + the
+    content-hashes. Detected by `before` being a hash string rather than a grid (a list)."""
+    return isinstance(row.get("before"), str)
+
+
+def row_hash(v, counter=frozenset()) -> str:
+    """The state-hash of a corpus field: an evicted stub already stores the hash (a str); a full
+    row stores the grid (a list) to hash. Lets every reader treat both forms uniformly."""
+    return v if isinstance(v, str) else state_hash(v, counter)
+
+
 class EpMem:
     """States deduped by content; edges keyed by (from, action). Transpositions
     collapse to one node because identical grids hash identically."""
 
     def __init__(self, counter=frozenset()) -> None:
         self.counter = counter                       # move-counter cells masked before hashing
-        self.states: dict[str, list] = {}            # hash -> grid (stored once)
+        self.states: dict[str, list | None] = {}     # hash -> grid (stored once; None if evicted)
         self.edges: dict[tuple, str] = {}            # (from, action, x, y) -> to
         self.preds: dict[str, set] = {}              # to -> {(from, action)}  (how reached)
         self.order: list[tuple[str, str, str]] = []  # trajectory: (from, action, to)
@@ -90,8 +102,18 @@ class EpMem:
 
     def ingest(self, before, action: str, x, y, after, spent=None) -> tuple[str, str]:
         hb, ha = state_hash(before, self.counter), state_hash(after, self.counter)
-        self.states.setdefault(hb, before)
-        self.states.setdefault(ha, after)
+        self.states[hb] = before                     # a full grid wins over a prior evicted stub (None)
+        self.states[ha] = after
+        return self._link(hb, action, x, y, ha, spent)
+
+    def ingest_hashed(self, hb: str, action: str, x, y, ha: str, spent=None) -> tuple[str, str]:
+        """Ingest an EVICTED stub by its stored hashes — no grid (it was compressed away). The
+        edge/trajectory/identity survive; only the renderable grid is gone (regenerate via replay)."""
+        self.states.setdefault(hb, None)             # setdefault: never clobber a real grid with None
+        self.states.setdefault(ha, None)
+        return self._link(hb, action, x, y, ha, spent)
+
+    def _link(self, hb, action, x, y, ha, spent) -> tuple[str, str]:
         self.edges[(hb, action, x, y)] = ha
         self.preds.setdefault(ha, set()).add((hb, action))
         self.order.append((hb, action, ha))
@@ -134,22 +156,52 @@ class EpMem:
         return sorted(repeated)
 
 
+def counter_path(corpus: Path) -> Path:
+    """The PINNED move-counter mask sits beside the corpus. Once consolidation starts (spend/evict),
+    the counter is frozen here so every later load hashes under the SAME mask — full rows and evicted
+    stubs stay consistent, and a spent edge-key keeps matching as the corpus grows. Without the pin,
+    re-detecting from a shrunk/grown row set could shift the mask and silently corrupt dedup."""
+    return corpus.parent / "counter.json"
+
+
+def load_counter(corpus: Path):
+    """The pinned counter as a frozenset of (y,x), or None if never pinned (→ detect fresh)."""
+    p = counter_path(corpus)
+    if not p.exists():
+        return None
+    return frozenset((y, x) for y, x in json.loads(p.read_text()))
+
+
+def save_counter(corpus: Path, counter) -> None:
+    counter_path(corpus).write_text(json.dumps(sorted([y, x] for (y, x) in counter)))
+
+
 def load(path: Path) -> EpMem:
     if not path.exists():
         return EpMem()
     rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     if not rows:
         return EpMem()
-    # Detect the move-counter from the visited-state sequence, then hash with it masked.
-    states = [rows[0]["before"]] + [t["after"] for t in rows]
-    m = EpMem(counter=detect_counter(states))
+    # Use the PINNED counter if consolidation has frozen one (keeps full rows + evicted stubs
+    # consistent); else detect from the visited-state sequence (FULL rows only — stubs have no grid).
+    pinned = load_counter(path)
+    if pinned is not None:
+        m = EpMem(counter=pinned)
+    else:
+        full = [t for t in rows if not is_stub(t)]
+        states = ([full[0]["before"]] + [t["after"] for t in full]) if full else []
+        m = EpMem(counter=detect_counter(states))
     for t in rows:
-        m.ingest(t["before"], t["action"], t.get("x"), t.get("y"), t["after"],
-                 spent=t.get("spent"))
+        if is_stub(t):
+            m.ingest_hashed(t["before"], t["action"], t.get("x"), t.get("y"), t["after"],
+                            spent=t.get("spent"))
+        else:
+            m.ingest(t["before"], t["action"], t.get("x"), t.get("y"), t["after"],
+                     spent=t.get("spent"))
     return m
 
 
-def trace(rows: list) -> dict:
+def trace(rows: list, counter=None) -> dict:
     """A content-addressed TRACE: the ordered action series as a first-class evidence object.
 
     The series-hypothesis unit. Rather than leaning on a git commit RANGE (whose meaning shifts
@@ -163,11 +215,13 @@ def trace(rows: list) -> dict:
     """
     if not rows:
         return {"id": None, "initial": None, "steps": [], "final": None, "len": 0}
-    states = [rows[0]["before"]] + [t["after"] for t in rows]
-    counter = detect_counter(states)
+    if counter is None:
+        full = [t for t in rows if not is_stub(t)]
+        states = ([full[0]["before"]] + [t["after"] for t in full]) if full else []
+        counter = detect_counter(states)
     steps = [{"action": t["action"], "x": t.get("x"), "y": t.get("y"),
-              "before": state_hash(t["before"], counter),
-              "after": state_hash(t["after"], counter)} for t in rows]
+              "before": row_hash(t["before"], counter),
+              "after": row_hash(t["after"], counter)} for t in rows]
     core = {"initial": steps[0]["before"], "steps": steps, "final": steps[-1]["after"]}
     tid = hashlib.sha1(
         json.dumps(core, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:12]
@@ -188,7 +242,7 @@ def unique_edges(rows: list, counter=frozenset()) -> list[dict]:
     seen: set[str] = set()
     out: list[dict] = []
     for i, t in enumerate(rows):
-        hb, ha = state_hash(t["before"], counter), state_hash(t["after"], counter)
+        hb, ha = row_hash(t["before"], counter), row_hash(t["after"], counter)
         k = edge_key(hb, t["action"], t.get("x"), t.get("y"), ha)
         if k in seen:
             continue

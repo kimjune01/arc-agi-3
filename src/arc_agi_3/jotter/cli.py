@@ -46,7 +46,10 @@ def log(m: graph.EpMem) -> str:
 def show(m: graph.EpMem, h: str) -> str:
     if h not in m.states:
         raise SystemExit(f"jotter: no state {h}; never visited — act to reach it")
-    return f"state {h}:\n{render_grid(np.asarray(m.states[h], np.int16))}"
+    g = m.states[h]
+    if g is None:                                              # grid evicted (compressed away)
+        return f"state {h}: (evicted — grid compressed away; replay or simmer to regenerate)"
+    return f"state {h}:\n{render_grid(np.asarray(g, np.int16))}"
 
 
 def graph_edges(m: graph.EpMem) -> str:
@@ -85,6 +88,7 @@ def effects_report(path) -> str:
     non-constant distribution (e.g. `11: -2×11, -4×24`) exposes a rate that isn't fixed."""
     import json
     rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()] if path.exists() else []
+    rows = [t for t in rows if not graph.is_stub(t)]           # evicted stubs have no grid to diff
     if not rows:
         return "(empty corpus — play with piper first)"
     eff = graph.effects(rows)
@@ -108,13 +112,18 @@ def diff_report(path, index) -> str:
     if index is None:
         lines = ["spatial delta per recorded action (what changed, from the trace):"]
         for i, t in enumerate(rows):
-            d = graph.transition_diff(t["before"], t["after"])
             coord = f" ({t.get('x')},{t.get('y')})" if t.get("x") is not None else ""
+            if graph.is_stub(t):                               # grid evicted — no spatial delta to show
+                lines.append(f"  [{i}] {t['action']}{coord}: (evicted; replay to regenerate)")
+                continue
+            d = graph.transition_diff(t["before"], t["after"])
             lines.append(f"  [{i}] {t['action']}{coord}: {d.describe(max_cells=6)}")
         return "\n".join(lines)
     if not 0 <= index < len(rows):
         raise SystemExit(f"jotter: index {index} out of range (0-{len(rows)-1})")
     t = rows[index]
+    if graph.is_stub(t):
+        raise SystemExit(f"jotter: transition {index} is evicted (grid compressed away) — replay to regenerate")
     d = graph.transition_diff(t["before"], t["after"])
     return (f"[{index}] {t['action']} (x={t.get('x')}, y={t.get('y')}) spatial delta:\n"
             f"{d.describe(max_cells=60)}")
@@ -125,7 +134,7 @@ def trace_report(path) -> str:
     stable id you can cite as provenance (re-recording the same play reproduces it)."""
     import json
     rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()] if path.exists() else []
-    tr = graph.trace(rows)
+    tr = graph.trace(rows, _counter(path, rows))
     if not tr["id"]:
         return "(empty corpus — play with piper first)"
     lines = [f"trace {tr['id']}  ({tr['len']} steps)  "
@@ -154,8 +163,16 @@ def _spent_keys(ledger_path) -> frozenset:
     return frozenset(json.loads(l)["key"] for l in ledger_path.read_text().splitlines() if l.strip())
 
 
-def _counter(rows):
-    return graph.detect_counter([rows[0]["before"]] + [t["after"] for t in rows]) if rows else frozenset()
+def _detect_counter(rows):
+    full = [t for t in rows if not graph.is_stub(t)]            # evicted stubs carry no grid to mask
+    return graph.detect_counter([full[0]["before"]] + [t["after"] for t in full]) if full else frozenset()
+
+
+def _counter(corpus_path, rows):
+    """The counter to hash with: the PINNED one if consolidation has frozen it (so full rows and
+    evicted stubs stay consistent), else freshly detected. Pinned wins even if empty."""
+    pinned = graph.load_counter(corpus_path)
+    return pinned if pinned is not None else _detect_counter(rows)
 
 
 def pending_report(path, ledger_path) -> str:
@@ -165,7 +182,7 @@ def pending_report(path, ledger_path) -> str:
     rows = _rows(path)
     if not rows:
         return "(empty corpus — play with piper first)"
-    counter = _counter(rows)
+    counter = _counter(path, rows)
     spent = _spent_keys(ledger_path)
     pend = graph.pending_edges(rows, counter, spent)
     head = (f"pending (deduped, un-consolidated): {len(pend)} of "
@@ -189,7 +206,7 @@ def spend(path, ledger_path, indices, into) -> str:
     rows = _rows(path)
     if not rows:
         raise SystemExit("jotter: empty corpus — nothing to spend")
-    counter = _counter(rows)
+    counter = _counter(path, rows)
     existing = set(_spent_keys(ledger_path))
     added = 0
     with ledger_path.open("a") as f:
@@ -208,6 +225,44 @@ def spend(path, ledger_path, indices, into) -> str:
     return f"spent {added} episode(s){f' into {into}' if into else ''}; {rem} pending"
 
 
+def evict(path, ledger_path, dry_run: bool) -> str:
+    """COMPRESSION (the sleep-prune): drop the heavy grids of CONSOLIDATED (spent) transitions,
+    leaving a hash-stub (action + coords + before/after hashes + budget stamp). The ordered ACTION
+    LOG and the content identity survive — only the renderable grid goes, and it's regenerable via
+    replay (or simmer, where the rule models it). Loose by design: a wrong evict costs a re-derive,
+    not corruption (the deterministic action log is the backstop). Un-spent episodes keep their
+    grids. `--dry-run` reports without rewriting."""
+    import json
+    rows = _rows(path)
+    if not rows:
+        return "(empty corpus — nothing to evict)"
+    counter = _counter(path, rows)
+    spent = _spent_keys(ledger_path)
+    out, n, saved = [], 0, 0
+    for t in rows:
+        if graph.is_stub(t):
+            out.append(t)
+            continue
+        hb = graph.state_hash(t["before"], counter)
+        ha = graph.state_hash(t["after"], counter)
+        if graph.edge_key(hb, t["action"], t.get("x"), t.get("y"), ha) in spent:
+            stub = {"action": t["action"], "x": t.get("x"), "y": t.get("y"),
+                    "before": hb, "after": ha, "evicted": True}
+            if t.get("spent") is not None:                      # keep piper's BUDGET stamp (audit/replay)
+                stub["spent"] = t["spent"]
+            saved += len(json.dumps(t)) - len(json.dumps(stub))
+            out.append(stub)
+            n += 1
+        else:
+            out.append(t)                                       # un-spent: keep the full grid
+    if not dry_run and n:
+        graph.save_counter(path, counter)                      # PIN the mask so stubs + future rows stay consistent
+        path.write_text("".join(json.dumps(r) + "\n" for r in out))
+    verb = "would evict" if dry_run else "evicted"
+    return (f"{verb} {n} consolidated episode(s)' grids (~{saved} bytes reclaimed); "
+            f"action log + hashes + budget stamps kept")
+
+
 _CONTRACT = """\
 jotter — episodic memory (epmem): the content-addressed, PERMANENT record of what happened.
 
@@ -218,6 +273,7 @@ consolidation pipe reads it through a cheap mechanical filter:
   diff [i] | effects | show      what an action did (spatial / count), recovered without re-spending
   pending                        the ADMISSION SET — deduped, un-consolidated episodes (the cheap filter)
   spend <idx>... --into <node>   tombstone episodes as consolidated, so `pending` shrinks
+  evict [--dry-run]              compress: drop the grids of consolidated episodes (keep action log + hashes)
   has <hash> | audit             membership; reconcile vs piper's budget stamps
 
 Pull specifics from `jotter <cmd> --help`. Corpus is $ARCG_STATE_DIR/transitions.jsonl; the spent
@@ -246,6 +302,9 @@ def main() -> None:
     sp.add_argument("index", type=int, nargs="+")
     sp.add_argument("--into", default=None, help="the dagger anchor they were consolidated into")
     sp.set_defaults(fn=None, want=None)
+    ev = sub.add_parser("evict", help="compress: drop grids of consolidated episodes, keep action log + hashes")
+    ev.add_argument("--dry-run", action="store_true", help="report what would be evicted without rewriting")
+    ev.set_defaults(fn=None, want=None)
     args = p.parse_args()
 
     if args.cmd is None:               # no-args: the driving-contract (progressive disclosure)
@@ -261,6 +320,10 @@ def main() -> None:
 
     if args.cmd == "spend":            # tombstone consolidated episodes (sidecar ledger)
         print(spend(corpus_path, _ledger(corpus_path), args.index, args.into))
+        return
+
+    if args.cmd == "evict":            # compress: drop consolidated grids, keep action log + hashes
+        print(evict(corpus_path, _ledger(corpus_path), args.dry_run))
         return
 
     if args.cmd == "effects":          # reads raw transitions (count facts), not the dedup graph

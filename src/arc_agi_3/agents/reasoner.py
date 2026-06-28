@@ -27,7 +27,7 @@ _TERMINAL = ("WIN", "GAME_OVER")
 
 # The durable memories — the agent's actual product. A checkpoint is a copy of these; resuming from
 # one is how learning compounds across runs (and how it transfers to another agent/machine).
-MEMORY_FILES = ("notes.md", "transitions.jsonl", "graph.db", "consolidated.jsonl")
+MEMORY_FILES = ("notes.md", "transitions.jsonl", "graph.db", "consolidated.jsonl", "counter.json")
 
 # The tool allowlists ENFORCE the read/write split between the two passes (not just the prompt):
 #   FORWARD (wake/explore) acts the game and writes jotter + notes; it only READS dagger (the plan
@@ -192,7 +192,11 @@ def run(game: str, *, units: int = 3, cycles: int = 1, budget: int = 20, model: 
                          spent=sess.actions_spent if sess else None,
                          state=sess.state if sess else None)
                 log.append(r)
-            cr = run_backward_unit(model=model)             # SLEEP: consolidate + remediate
+            cr = run_backward_unit(model=model)             # SLEEP: consolidate + remediate (LLM judgment)
+            corpus = STATE_DIR / "transitions.jsonl"        # sleep-prune: compress what was consolidated
+            if corpus.exists():                             # MECHANICAL (harness computes; not the LLM's call)
+                from ..jotter import cli as _jc
+                cr["evict"] = _jc.evict(corpus, _jc._ledger(corpus), dry_run=False)
             cr.update(phase="consolidate", cycle=c + 1)
             log.append(cr)
     finally:

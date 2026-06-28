@@ -53,6 +53,50 @@ def test_spend_tombstones_idempotently_and_shrinks_pending(tmp_path):
     assert corpus.read_text().count("\n") == 1                      # grounded trace untouched (2 lines)
 
 
+def test_evict_compresses_spent_episodes_keeping_the_action_log(tmp_path):
+    """Stage 2 (compression): evict drops the GRIDS of consolidated episodes but keeps the action
+    log + content-hashes. Un-spent episodes keep their grids. The whole corpus still loads."""
+    import json
+
+    from arc_agi_3.jotter import cli, graph
+    A, B, C = _g(1), _g(2), _g(3)
+    corpus = tmp_path / "transitions.jsonl"
+    rows = [_t(A, "ACTION1", B), _t(B, "ACTION2", C), _t(A, "ACTION1", B)]  # step 2 repeats edge 0
+    corpus.write_text("".join(json.dumps(t) + "\n" for t in rows))
+    ledger = cli._ledger(corpus)
+
+    cli.spend(corpus, ledger, [0], "node")                         # consolidate the A->B edge
+    assert "evicted 2" in cli.evict(corpus, ledger, dry_run=False)  # BOTH A->B occurrences (0 and 2)
+
+    after = [json.loads(l) for l in corpus.read_text().splitlines()]
+    assert len(after) == 3                                          # action log length preserved
+    assert graph.is_stub(after[0]) and graph.is_stub(after[2])      # spent edge -> grids dropped
+    assert not graph.is_stub(after[1])                             # un-spent B->C keeps its grid
+    m = graph.load(corpus)                                          # the deduped graph still loads
+    assert len(m.order) == 3
+    assert "1 of 2" in cli.pending_report(corpus, ledger)          # eviction doesn't disturb pending
+
+
+def test_evict_preserves_identity_hashes(tmp_path):
+    """Regression: re-detecting the counter from a shrunk row set shifted the hash mask and silently
+    corrupted dedup. The PINNED counter keeps the trace's content-hashes identical across eviction."""
+    import json
+
+    from arc_agi_3.jotter import cli, graph
+    A, B, C = _g(1), _g(2), _g(3)
+    corpus = tmp_path / "transitions.jsonl"
+    corpus.write_text("".join(json.dumps(t) + "\n" for t in [_t(A, "ACTION1", B), _t(B, "ACTION2", C)]))
+    ledger = cli._ledger(corpus)
+    before = [s["before"] for s in graph.trace([_t(A, "ACTION1", B), _t(B, "ACTION2", C)])["steps"]]
+
+    cli.spend(corpus, ledger, [0], "n")
+    cli.evict(corpus, ledger, dry_run=False)
+
+    after_rows = [json.loads(l) for l in corpus.read_text().splitlines()]
+    after = [s["before"] for s in graph.trace(after_rows, graph.load_counter(corpus))["steps"]]
+    assert after == before                                          # identity unchanged by compression
+
+
 def test_same_grid_hashes_identically():
     assert state_hash(_g(1)) == state_hash(_g(1))
     assert state_hash(_g(1)) != state_hash(_g(2))

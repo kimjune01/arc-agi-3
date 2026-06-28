@@ -984,3 +984,35 @@ both more efficient — the LLM only sees what's new — and unit-testable witho
 Eviction (the compression endgame) deferred — it mutates the sacrosanct corpus and needs the
 tombstone first, which now exists. 3 mechanical unit tests (dedup, admission-minus-spent, spend
 idempotent + trace-untouched), all LLM-free. Full suite 81.
+
+## 2026-06-28 — consolidation pipe, stage 2: eviction (the sleep-prune), + a bug testing caught
+
+`jotter evict` — COMPRESSION: drop the heavy grids of consolidated (spent) episodes, leaving a
+hash-stub (action + coords + before/after hashes + budget stamp). The ordered ACTION LOG and the
+content identity survive; only the renderable grid goes, regenerable via replay (or simmer where the
+rule models it). Loose by design — a wrong evict costs a re-derive, not corruption (the deterministic
+action log is the backstop; confidence can be a vibe). Un-spent episodes keep their grids. The
+loader + deduped-graph readers (`load`, `trace`, `unique_edges`) are now stub-aware; the
+grid-consumers (`show`, `diff`, `effects`) degrade gracefully on an evicted state.
+
+Wired as a MECHANICAL post-sleep step in `run()` — the harness computes the prune, it is NOT the
+LLM's call ("the tool computes, the reasoner strategizes"). This is the SHY/synaptic-downscaling
+half of sleep: the LLM consolidates (spend), the harness compresses (evict).
+
+**A bug the build-then-test caught (the reason to test, not just ship):** the first smoke run showed
+post-eviction trace hashes DIFFERING from pre-eviction. Root cause — `detect_counter` re-runs at
+load over the *remaining* rows, so dropping rows shifted the move-counter mask and silently corrupted
+dedup (the same state hashing two ways). Fix: PIN the counter once consolidation starts (a
+`counter.json` sidecar, added to checkpointed MEMORY_FILES); every reader hashes under the pinned
+mask, so full rows and evicted stubs stay consistent — and a spent edge-key keeps matching as the
+corpus grows (a latent stage-1 risk closed too). Regression test asserts trace hashes are identical
+across eviction.
+
+**Calibration principle (logged for the cadence roadmap, tentative):** ~30% of the body's energy
+goes to the brain, ~30% of life is spent asleep — nature's allocation to NON-ACTIONING compute. The
+agent has two analogues: the compute share (LLM thinking vs the RHAE action budget) and the sleep
+cadence (consolidate vs act). Target ~1/3 to non-actioning compute when tuning the threshold-trigger
+— substantial and deliberate, neither a quick flush nor paralysis. The cheap admission filter is what
+makes that third BUY something (it's spent translating novel episodes, not re-judging duplicates).
+
+2 more unit tests (eviction keeps the action log + degrades; identity-hash regression). Full suite 83.
