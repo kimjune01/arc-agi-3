@@ -163,8 +163,10 @@ def run_forward_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: flo
     return _run_session(FORWARD_TASK, _FORWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
 
 
-def run_backward_unit(*, model: str = "sonnet", max_turns: int = 14, timeout: float = 300.0) -> dict:
-    """One SLEEP pass: consolidate grounded patterns into the DAG and remediate the notes. No play."""
+def run_backward_unit(*, model: str = "sonnet", max_turns: int = 30, timeout: float = 420.0) -> dict:
+    """One SLEEP pass: consolidate grounded patterns into the DAG and remediate the notes. No play.
+    Gets MORE turns than a forward unit — it reads everything, writes several nodes, then prunes, so
+    a forward-unit cap (14) starved it before remediation."""
     return _run_session(CONSOLIDATE_TASK, _BACKWARD_ALLOWED, model=model, max_turns=max_turns, timeout=timeout)
 
 
