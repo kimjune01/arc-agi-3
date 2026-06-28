@@ -171,6 +171,53 @@ def actionable(node: Node, stakes: str = PAID) -> bool:
     return confidence(node) >= _STAKES.get(stakes, _STAKES[PAID])
 
 
+# --- retention: keep by UTILITY, not just frequency (generalize-or-specialize) --------------------
+# STUB / UNVERIFIED, not wired into any eviction yet. Pointer: https://june.kim/generalize-or-specialize
+# ("Generalize or Specialize? Retaining Reusable Skills for World-Model Agents"). Skill-library
+# retention IS cache eviction, and the two criteria the literatures reinvented separately are:
+#   compression / MDL  — keep what RECURS (frequency; LFU). This is exactly `confidence` above.
+#   planning utility    — keep what is DEAR TO RECOMPUTE (miss-penalty; GreedyDual-Size, Soar
+#                         apoptosis "spare the costly-to-reconstruct"; Minton's utility problem).
+# They AGREE where frequency tracks search-value (Blocksworld) and DIVERGE on the rare-but-critical
+# specialist (Liar's Dice). A long-horizon grid agent is conjectured to live in the divergence
+# corner — where keeping only the general (frequency) half keeps the WRONG half. THIS AGENT is the
+# paper's intended live-ablation vehicle, and run 2026-06-28 produced the corner in the wild: the
+# scoring recipe (`overlap-lock`/`collect-token`) is a rare-but-critical skill (1 occurrence,
+# witnessed ×2) sitting among 19 frequent movement transitions. `confidence`-as-witness-count alone
+# ranks it LOW and `actionable` then distrusts the highest-value skill *because* it is rare — the
+# exact failure the paper predicts. The fix is to price the miss-penalty we have natively: rediscover
+# `overlap-lock` = the whole collect→route→overlap search (huge); re-derive a movement transition =
+# a free simmer rollout (~nil).
+#
+# pseudocode (GDSF-style: compression term × utility term, against a shared carrying cost):
+#   reconstruction_cost(node):                # the miss-penalty: search redone if we DROP it
+#     if node.status == "open":      return ~0       # a dream — re-abducible free (DAGGER.md "forget dreams first")
+#     if node re-derivable in simmer: return small    # deductive, free regime (movement mechanics)
+#     if node's discovering trial was PAID/scored:     return large   # cost-class from the discriminating trial
+#     else (unmodellable):           return large     # no finite certificate under the abstraction
+#   retention_value(node) = confidence(node) * reconstruction_cost(node) / carrying_cost(node)
+#   evict the lowest retention_value first when |L| exceeds the bound — NOT the lowest confidence.
+# Composition caveat the paper flags as open: dagger nodes build on each other, so this is eviction
+# over a DEPENDENCY GRAPH (dropping a child changes the cost of its parents) — classical GDSF prices
+# independent items. Keep that in mind before wiring; for now the signal `reconstruction_cost` needs
+# is the per-node cost-class of its discriminating trial (free / paid / unmodellable — already a
+# DAGGER.md concept), which the Node record does not yet carry. Discover the field on first need.
+
+def reconstruction_cost(node: Node) -> float:
+    """STUB (UNVERIFIED): the miss-penalty — search redone if `node` were evicted. The UTILITY side
+    of retention (above). Returns a placeholder until the Node carries its discriminating trial's
+    cost-class; see the block comment + https://june.kim/generalize-or-specialize ."""
+    raise NotImplementedError("retention utility term: see block comment + generalize-or-specialize")
+
+
+def retention_value(node: Node) -> float:
+    """STUB (UNVERIFIED): keep-priority for a bounded library = compression × utility (GDSF). Today
+    the DAG only accumulates (no grounded-node eviction); this names the criterion to evict by WHEN a
+    bound bites, so the rare-but-critical skill is not dropped for being infrequent. Pseudocode +
+    rationale in the block comment above."""
+    raise NotImplementedError("retention by utility, not frequency: see block comment")
+
+
 def plan(conn, goal: str):
     """JIT: return a cached, non-killed compound node whose `post` matches `goal` (a hit), else a
     HOLE to abduce. Match uses the matcher stub, so only an exact prior decomposition hits today."""

@@ -1063,3 +1063,117 @@ the decision, indexed by what's at risk; a plan isn't actionable merely by exist
   yet, plan=Hole, 0 surprises, clean). The exploit path activates once a witnessed win-recipe exists.
 
 2 driver unit tests. Full suite 87.
+
+## 2026-06-28 — FIRST LS20 POINT (manual): the win-recipe witnessed, the "blocked from below" resolved
+
+LS20 is off zero. Drove it by hand through `arcg` (the piper layer — I am the driver) and scored
+0→1 at action 23, throwaway store `/tmp/arcg-win1`. The central blocker — last session's "the
+controllable 12/9 stack is blocked when approached from below, so the win-trigger is NOT
+overlap-from-below" — was a MISREAD of a missing precondition, not a wrong approach.
+
+What the board actually is (richer than the old NOTES read):
+- **Avatar** = the 12/9 stack (colour-12 on top, colour-9 below), a solid 5x5 block. Directional
+  actions slide the WHOLE stack 5 cells per move within the colour-3 region. (The tiny 0/1 cluster
+  is NOT the avatar — it never moved with input.)
+- **Lock** = the top box (colour-5 frame holding a sparse colour-9 glyph). Reachable ONLY from
+  directly below via its own column corridor — no side/top approach exists.
+- **Token** = the unique 0/1 marker (colours 0 and 1 appear nowhere else). Overlapping it CONSUMES
+  it and toggles the avatar's CARRIED KEY.
+- **Carried key** = displayed in the bottom-left inventory box as a 3x3 (each cell a 2x2 block).
+  Read level 1: before collect `[9 9 9 / 9 . . / 9 . 9]`; the lock glyph was `[9 9 9 / . . 9 / 9 . 9]`.
+  They DIFFER → overlap blocked. Collecting the token flipped the carried middle row `9 . .`→`. . 9`,
+  making carried == lock.
+- **colour-11 strip** = on-board step budget (loses 2 cells/effective-action; blocked moves are
+  cheap/free on the strip but still cost the action budget). **colour-8** (3x 2x2, bottom-right) =
+  level indicator.
+
+The recipe (DAGGER.md's worked example, now WITNESSED, not hypothetical):
+
+    deposit-one-point  (post: score += 1; full level regenerates)
+      = collect-token        (pre: carried != lock; post: carried key toggled toward lock)
+      ; route-to lock        (BFS over the maze; shared sub-action; RE-PLANNED per level)
+      ; overlap-lock         (pre: carried matches lock; post: +1, regen)
+
+The clean **contrast pair** that isolates the cause (n=1 Boolean under determinism): action 9
+overlap-up = BLOCKED (carried != lock) vs action 23 overlap-up = +1 (carried == lock). The only
+feature that differs across the pair is the carried-key state. So overlap-lock's precondition
+`carried matches lock` is cleanly grounded; the kill of the token-less decomposition (run3's
+`from-kill` reinstating collect-token) is vindicated.
+
+Not-yet-reusable-directly (the honest limit, per June): the level REGENERATES into a fresh maze on
+each score AND the lock parity ALTERNATES — level 2's lock came up `[9 9 9 / 9 . . / 9 . 9]` while
+the carried key persisted as `[9 9 9 / . . 9 / 9 . 9]`, so level 2 again needs a collect to flip
+back. So the reusable artifact is the ABSTRACT decomposition (children are GOALS re-planned per
+level), with `collect-token` CONDITIONAL on `carried != lock` (a toggle-parity check), NOT the
+23-action concrete trace. Bridge to the cognitive pipe: `/tmp/arcg-win1`'s MEMORY_FILES
+(transitions.jsonl with the scoring episode + the recipe note) can seed a durable `--checkpoint`
+the reasoner resumes from; the sleep pass then consolidates the composite. Consolidation altitude
++ open-vs-live left for the next step (the causal mechanic is live-able now; the composite's
+cross-level reuse is still a 1-witness dream → likely `open` until a second level is scored
+through the pipe).
+
+No code changed; suite still 87. Receipt: `arcg note` in `/tmp/arcg-win1`, this entry.
+
+## 2026-06-28 — sleep pass consolidates the first scoring episode (bottom-up, honest altitude)
+
+Fed the manual scoring episode (checkpoints/ls20-firstpoint, seeded from /tmp/arcg-win1's
+MEMORY_FILES) to the SLEEP pass: `reason ls20 --units 0 --cycles 1 --checkpoint <dir>` (units=0 =
+consolidate-only). First time the consolidator has EVER had a scoring episode — the standing gap.
+
+A gap caught first (June's nudge, "build nodes bottom-up / we deposited actions from primitive
+inputs before"): the checkpoint's `graph.db` was EMPTY — `dagger init` was never run, so there were
+NO primitive-action leaves to compose up from. A baseless graph forces top-down. Fixed: `dagger init
+ACTION1..4` deposits the base (apex win-game + 4 leaves), then the sleep pass builds act-up from
+them. Added a bottom-up steering note pointing at the leaves + candidate evidence (verdict left to
+the pass's discipline).
+
+Result (7-node graph, built bottom-up — children are the primitive leaves):
+- **overlap-lock** [live, grounded] = sequence[ACTION1]; post "ACTION1 into lock from below: +1 &
+  regen when carried==lock; blocked when carried!=lock"; evidence [8],[22] (the contrast pair the
+  discipline demands — no-change vs 1477-cell regen, the one differing feature = carried-key state).
+- **collect-token** [live, grounded] = sequence[ACTION2]; post "token consumed, carried-key toggles
+  toward lock glyph"; evidence [9],[14].
+- **win-game** stayed [open, speculative] — the pass did NOT force a `deposit-one-point` composite.
+  Its own reason: the 19 remaining pending episodes are movement transitions with no `route-to-lock`
+  composite to fold into yet. Honest altitude: the cleanly-grounded act-up mechanics go live; the
+  top-down win-recipe waits for `route-to-lock` + a 2nd witness (levels regenerate AND lock parity
+  flips, so one trace can't show the sequence reusable). jotter pending: 19/23 (4 spent) — the
+  consolidated edges tombstoned, pipe end-to-end (admit→decompose→spend).
+
+FINDING (note/graph drift, for a discipline tightening): the remediated NOTES claim nodes
+(`vertical-explore`, `4dir-map`, `lateral-drag-c9`, killed `null-cycle`/`vert-blocked-adj-c9`) that
+are NOT in the graph and whose episodes were NOT spent (only the 4 above were). Notes are the
+belief-provenance track (TRUSTED, not replay-verifiable) — exactly where a hallucinated "CONSOLIDATED
+dagger:X" is dangerous (an auditor trusts it). Candidate postgate: every "CONSOLIDATED dagger:<a>"
+note must resolve to a live node <a> (a cheap mechanical check the harness can run after a sleep
+pass), else bounce. Logged, not built (ratchet).
+
+Next: still 0 exploit-able (win-game open → driver.decide still explores). To activate the exploit
+path, consolidate `route-to-lock` and score a 2nd level THROUGH the pipe to promote deposit-one-point.
+No code changed; suite still 87.
+
+## 2026-06-28 — retention stub: keep by utility, not frequency (generalize-or-specialize)
+
+Connected today's consolidation to the position/survey paper *Generalize or Specialize?*
+(https://june.kim/generalize-or-specialize), which names THIS agent as its intended live-ablation
+vehicle. Skill-library retention IS cache eviction; its two criteria are compression/MDL (keep what
+recurs = `confidence`-as-witness-count, LFU) and planning utility (keep what's dear to recompute =
+miss-penalty, GreedyDual/Soar-apoptosis/Minton). They diverge on the rare-but-critical specialist —
+and run 2026-06-28 produced that corner in the wild: the scoring recipe (`overlap-lock`/`collect-token`)
+is a 1-occurrence, witnessed-×2 skill among 19 frequent movement transitions. `confidence` alone
+ranks it LOW and `actionable` then distrusts the highest-value skill *because* it is rare — the exact
+failure the paper predicts. The agent as built is compression-biased; the utility signal so far lives
+only in the LLM sleep-pass judgment (it kept overlap-lock because it scores), not in the mechanical rule.
+
+Stubbed `reconstruction_cost(node)` + `retention_value(node)` in `dagger/dag.py` (UNVERIFIED,
+NotImplementedError, not wired into any eviction — the DAG only accumulates today). Block comment
+carries the paper pointer, the GDSF pseudocode (`retention_value = confidence × reconstruction_cost /
+carrying_cost`; evict lowest-value, not lowest-confidence), the miss-penalty we have natively
+(rediscover overlap-lock = the whole collect→route→overlap search; re-derive a movement = a free
+simmer rollout), and the two open hooks: the Node needs its discriminating trial's cost-class
+(free/paid/unmodellable, a DAGGER.md concept it doesn't yet carry), and eviction here is over a
+DEPENDENCY GRAPH (composing nodes), which classical GDSF doesn't price. Suite still 87.
+
+This is the buildable seam for the paper's open-problem #3 (ablate retention in a live world-model
+agent): frequency-keep vs utility-keep on a library that now contains one certified divergence-corner
+skill. Not run yet — stub names the criterion; wiring waits on the cost-class field.
