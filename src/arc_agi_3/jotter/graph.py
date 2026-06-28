@@ -130,6 +130,9 @@ class EpMem:
             "stamped": len(stamps),
             "stamp_range": (stamps[0], stamps[-1]) if stamps else None,
             "gapless": gapless,
+            # NOT an off-by-one: piper stamps `actions_spent`, which is incremented BEFORE the
+            # transition is recorded (layer0 `_apply`), so stamps are 1-indexed (first action -> 1).
+            # A complete gapless run of N is therefore [1..N], and len(order) == stamps[-1] == N.
             "count_matches_last_stamp": bool(stamps) and len(self.order) == stamps[-1],
         }
 
@@ -270,9 +273,10 @@ def diffs(rows: list) -> list:
     """Per-transition spatial deltas over the whole trace: the position story, the spatial twin of
     `effects` (the count story). Movement is count-conserved, so it shows HERE but is invisible to
     `effects` — this is how the agent recovers an action's effect from the trace instead of
-    re-spending budget to rediscover it. Returns [(i, action, x, y, Delta), ...]."""
+    re-spending budget to rediscover it. Returns [(i, action, x, y, Delta), ...]. Evicted stubs have
+    no grid to diff, so they're skipped — the original index `i` is preserved on the rows that remain."""
     return [(i, t["action"], t.get("x"), t.get("y"), transition_diff(t["before"], t["after"]))
-            for i, t in enumerate(rows)]
+            for i, t in enumerate(rows) if not is_stub(t)]
 
 
 def effects(rows: list) -> dict:
@@ -284,10 +288,13 @@ def effects(rows: list) -> dict:
     ground truth (and a non-constant distribution, e.g. `11: -2×11, -4×24`, exposes a rate that
     isn't fixed — exactly the fact an estimate gets wrong).
 
-    Returns `{action: {colour: Counter(delta -> occurrences)}}`, only non-zero deltas.
+    Returns `{action: {colour: Counter(delta -> occurrences)}}`, only non-zero deltas. Evicted stubs
+    carry no grid, so they're skipped (count deltas need the before/after grids).
     """
     out: dict = {}
     for t in rows:
+        if is_stub(t):
+            continue
         a = t.get("action")
         b = np.asarray(t["before"], np.int16)
         af = np.asarray(t["after"], np.int16)

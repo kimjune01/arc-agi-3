@@ -193,15 +193,8 @@ def actionable(node: Node, stakes: str = PAID) -> bool:
 #   planning utility    — keep what is DEAR TO RECOMPUTE (miss-penalty; GreedyDual-Size, Soar
 #                         apoptosis "spare the costly-to-reconstruct"; Minton's utility problem).
 # They AGREE where frequency tracks search-value (Blocksworld) and DIVERGE on the rare-but-critical
-# specialist (Liar's Dice). A long-horizon grid agent is conjectured to live in the divergence
-# corner — where keeping only the general (frequency) half keeps the WRONG half. THIS AGENT is the
-# paper's intended live-ablation vehicle, and run 2026-06-28 produced the corner in the wild: the
-# scoring recipe (`overlap-lock`/`collect-token`) is a rare-but-critical skill (1 occurrence,
-# witnessed ×2) sitting among 19 frequent movement transitions. `confidence`-as-witness-count alone
-# ranks it LOW and `actionable` then distrusts the highest-value skill *because* it is rare — the
-# exact failure the paper predicts. The fix is to price the miss-penalty we have natively: rediscover
-# `overlap-lock` = the whole collect→route→overlap search (huge); re-derive a movement transition =
-# a free simmer rollout (~nil).
+# specialist (Liar's Dice). A long-horizon grid agent is CONJECTURED to live in the divergence
+# corner — where keeping only the general (frequency) half keeps the WRONG half.
 #
 # pseudocode (GDSF-style: compression term × utility term, against a shared carrying cost):
 #   reconstruction_cost(node):                # the miss-penalty: search redone if we DROP it
@@ -211,11 +204,33 @@ def actionable(node: Node, stakes: str = PAID) -> bool:
 #     else (unmodellable):           return large     # no finite certificate under the abstraction
 #   retention_value(node) = confidence(node) * reconstruction_cost(node) / carrying_cost(node)
 #   evict the lowest retention_value first when |L| exceeds the bound — NOT the lowest confidence.
-# Composition caveat the paper flags as open: dagger nodes build on each other, so this is eviction
-# over a DEPENDENCY GRAPH (dropping a child changes the cost of its parents) — classical GDSF prices
-# independent items. Keep that in mind before wiring; for now the signal `reconstruction_cost` needs
-# is the per-node cost-class of its discriminating trial (free / paid / unmodellable — already a
-# DAGGER.md concept), which the Node record does not yet carry. Discover the field on first need.
+#
+# DELIBERATELY LEFT A STUB. A full wiring was built and live-driven on 2026-06-28 (LS20, cost-class
+# authored by the sleep pass), then BACKED OUT — it was machinery for a cache that never overflows,
+# and it loaded a judgement call onto the consolidate pipe before any filter. What the drive taught,
+# kept here so the next attempt doesn't repeat it:
+#   - The corner did NOT reproduce. The pass classed the frequent movement skill (witnessed ×18)
+#     `unmodellable`, not free — the simulator was blind to it — so utility-keep AGREED with
+#     frequency-keep (both rank frequent movement top, the rare paid recipes evict-first). Utility
+#     only beats frequency when the frequent skill is CHEAP to recompute; here it wasn't.
+#   - `cost_class` as drafted CONFLATES two things (codex): "intrinsically dear to rediscover" vs
+#     "the simulator can't currently replay it". Early simulator weakness makes common mechanics look
+#     dear and collapses utility back into frequency. Split them when revisiting: an `effect_kind`
+#     (movement/scoring/HUD/regen) the pass may judge, and a `replay_status`
+#     (reproduced/missed/unavailable) DERIVED MECHANICALLY from `simmer test`, never hand-authored.
+#   - The two consolidation stages fight: the sleep-prune evicts a spent transition's grids, so by
+#     the time you'd validate a node's cost-class the corpus is hash-stubs and simmer has nothing to
+#     replay. Any wiring needs the invariant "never leave a live node without a replayable exemplar
+#     or a validation certificate" (validate-then-evict, or pin one exemplar per consolidated node).
+#
+# UN-STUB ONLY WHEN all of: (1) a bound actually BITES (the library outgrows its budget — today it is
+# single digits, nothing to evict); (2) the keep-decision sits BEHIND THE CHEAP FILTER, never a
+# re-examination of every action — dedup (`jotter pending`/`unique_edges`) is the filter that already
+# spares the pass the raw trace, and a cost judgement, if any, runs only on what survives it;
+# (3) `replay_status` is derived from simmer, not guessed, and the field is CORRECTABLE (the current
+# put fills cost-class only on a status ratchet — an early wrong `unmodellable` would stick). Until
+# then the signal the utility term needs (the discriminating trial's cost-class) is NOT carried on
+# the Node — discover the field on first real need, designed per the split above.
 
 def reconstruction_cost(node: Node) -> float:
     """STUB (UNVERIFIED): the miss-penalty — search redone if `node` were evicted. The UTILITY side
@@ -239,6 +254,42 @@ def plan(conn, goal: str):
         if d["children"] and d["status"] != "killed" and entails(d["post"], goal):
             return _from_dict(d)
     return Hole(goal=goal)
+
+
+def closure(conn, goal: str = WIN) -> dict:
+    """Is the goal wired all the way down to runnable primitives? A pure-STRUCTURE traversal from the
+    goal node through its children, collecting the HOLES — points where the path breaks: an unauthored
+    child (a MISS / missing rung), a killed child (a dead end), or a childless non-leaf. Returns
+    `{goal, resolved, holes}`; `resolved` iff no holes. No game knowledge — this only reports WHERE
+    the plan is incomplete (the composing of a missing rung stays the sleep pass's judgement, not a
+    baked recipe). This is how 'explore until the path is wired' becomes checkable: a non-empty
+    `holes` is exactly why exploit can't fire yet."""
+    root = plan(conn, goal)
+    if isinstance(root, Hole):
+        return {"goal": goal, "resolved": False, "holes": [goal]}
+    holes: list[str] = []
+    seen: set[str] = set()
+
+    def walk(node: Node) -> None:
+        if node is None or node.anchor in seen:
+            return
+        seen.add(node.anchor)
+        if node.is_leaf:                                  # a runnable primitive — a resolved tip
+            return
+        if not node.children:                             # a compound with nothing under it
+            holes.append(node.anchor)
+            return
+        for ch in node.children:
+            cn = get(conn, ch)
+            if cn is None:
+                holes.append(ch)                          # unauthored rung — the JIT miss
+            elif cn.status == "killed":
+                holes.append(f"{ch} (killed)")            # dead end on the path
+            else:
+                walk(cn)
+
+    walk(root)
+    return {"goal": goal, "resolved": not holes, "holes": holes}
 
 
 def decompose(conn, anchor: str, goal: str, children, mode: str, status: str = "open",

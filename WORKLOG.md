@@ -1229,3 +1229,76 @@ primitive — i.e. you commit to a route when the RECIPE (the witnessed body) cl
 - Re-baked checkpoints/ls20-firstpoint: dropped the stale childless apex, re-seeded the spine; the
   live overlap-lock/collect-token preserved — so the next sleep pass authors the recipe UNDER the
   baked deposit-one-point.
+
+## 2026-06-28 — wired retention, live-drove it, BACKED IT OUT (kept the simmer fix + a map)
+
+Wired the retention stub (paper open-problem #3) end to end, drove LS20 live to see what the agent
+did with it, then reverted the wiring on the read that we were digging a hole (codex agreed). Net:
+back to the stub + one real bug fix; the stub now carries what the drive taught. Suite 91 → 92 (the
++1 is the simmer regression test).
+
+What the drive showed (the reason to back out, kept in dag.py's retention comment + here):
+- THE PREDICTED CORNER DID NOT REPRODUCE. With cost-class authored by the sleep pass, it classed
+  `move-avatar` (witnessed ×18) `unmodellable` — "simmer blind to colour-3 movement" — not free. So
+  utility-keep AGREED with frequency-keep (both rank frequent movement top, the rare paid recipes
+  `overlap-lock`/`collect-token` evict-first). Utility beats frequency only when the frequent skill
+  is cheap to recompute; here it wasn't, so pricing utility bought nothing.
+- Premature machinery. The skill library is single digits of nodes with no bound that bites — active
+  eviction had nothing to evict. It also pushed a judgement call (free/paid/unmodellable) onto the
+  consolidate pipe, which is meant to be a straight pipe: cheap FILTER first (dedup via `jotter
+  pending`/`unique_edges` is that filter — it spares the pass from re-examining every action), and a
+  judgement, if any, only on what survives the filter. The wiring inverted that.
+- `cost_class` as drafted conflates "dear to rediscover" with "simulator can't replay it yet" (codex).
+  Early simulator weakness makes common movement look dear → utility collapses into frequency. Split
+  on revisit: `effect_kind` (judged) vs `replay_status` (DERIVED from `simmer test`, not guessed).
+
+One real bug, KEPT FIXED (independent of the retention thread):
+- `simmer test` CRASHED on evicted stubs (`np.asarray("4b72de2be6", int16)`). The sleep-prune drops a
+  spent transition's grids to hash-stubs; `test`/`step` now skip them ("N evicted, skipped" / graceful
+  error). +1 regression test. This also surfaced that the prune had evicted the ENTIRE corpus, so
+  even fixed, `simmer test` returns 0/0 — the two consolidation stages fight: eviction destroys the
+  grids cost-class validation would need. Any future wiring needs "never leave a live node without a
+  replayable exemplar or a validation certificate" (validate-then-evict, or pin one exemplar/node).
+
+Reverted: the cost_class field + column, the live retention functions, `evict_order`, the `dagger
+retention` CLI + `--cost-class` flag, and the consolidate-prompt/epilog cost-class authoring. The
+un-stub criteria (a bound that bites; the keep-decision behind the cheap filter, never re-examining
+every action; replay_status derived + the field correctable) live in the dag.py stub comment.
+
+## 2026-06-28 — consolidation fixes: pin evidence on evict, + a plan-closure check
+
+Took the OVERLAP between my improvement list and codex's review (both consulted), implementing only the
+prior-free ones (no game knowledge baked in). Suite 92 → 95.
+
+The two structural fixes both literatures pointed at:
+- PIN EVIDENCE ON EVICT (jotter/cli `evict`). The `spent -> evict` coupling was the bug: a transition
+  got its grids destroyed just because it had been consolidated, even while a live/open dagger node
+  still cited it — which is why a whole run's corpus went to hash-stubs and we could neither validate
+  cost-class, run `simmer test`, nor audit the `one-way-wall` claim. Fix: `_pinned_evidence` reads the
+  node store directly (no dagger import — the nodes live in jotter.db) and collects the evidence refs
+  of every NON-KILLED node; `evict` keeps the full grid of any spent transition whose index/hash is
+  pinned. So 'spent' (consolidated) is decoupled from 'safe to destroy as evidence': every standing
+  claim stays replayable, and an OPEN dream keeps its grids auditable (the exact substrate missing when
+  I tried to check one-way-wall). Killed nodes don't pin — their evidence is free to compress.
+- PLAN-CLOSURE CHECK (dagger `closure`, CLI `dagger closure`, printed at end of a reason run). Pure
+  graph traversal from the goal down through children, reporting the HOLES — an unauthored rung (a
+  MISS), a killed rung (dead end), or a childless compound. On the checkpoint it reports exactly why
+  the agent never scored: `'win game' has 1 hole — deposit-one-point` (the recipe rung under the spine
+  was never composed, so exploit can't fire). Makes "explore until the path is wired" checkable. It
+  only REPORTS holes; composing the missing rung stays the sleep pass's judgement (no recipe baked in).
+
+Then the SAFE remaining guards (pure defensive correctness, no behaviour change on full rows): made
+`graph.effects()` / `graph.diffs()` skip evicted stubs internally (same crash class as the simmer-test
+fix — they'd `np.asarray("<hash>")` and throw), and guarded `pending_report` so a stubbed row can't
+crash the admission report. Verified the `audit` off-by-one codex flagged is a NON-issue (piper stamps
+`actions_spent` from 1, so `len(order)==stamps[-1]` is correct) — left untouched rather than "fix" a
+correct thing.
+
+Deliberately left for later (codex-only, or not prior-free): typed evidence schema + evidence-CLASSES
+(positive/negative/contrast) for retention; the explicit compose phase; bounded-wake; `preds` coord
+identity + edge-overwrite conflict detection (behaviour-changing on content-addressing primitives, not
+"safe").
+
+Tests: test_jotter `effects_and_diffs_skip_evicted_stubs`, `evict_pins_grids_cited_by_a_standing_node`
+(live pins, killed doesn't); test_dagger `closure_reports_the_unwired_rung_then_closes` +
+`closure_flags_a_killed_rung`. Suite 92 → 96.

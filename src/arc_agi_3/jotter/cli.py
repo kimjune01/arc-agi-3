@@ -163,6 +163,23 @@ def _spent_keys(ledger_path) -> frozenset:
     return frozenset(json.loads(l)["key"] for l in ledger_path.read_text().splitlines() if l.strip())
 
 
+def _pinned_evidence(corpus_path) -> frozenset:
+    """Episode refs cited by a NON-KILLED node in the graph store — the grids the abstraction still
+    depends on. Eviction must keep these, decoupling 'spent' (consolidated) from 'safe to destroy as
+    evidence': a live/open claim has to stay auditable and replayable. Reads the node table directly
+    (jotter.db), so no dagger import — the refs are step indices or state hashes the post is attributed
+    to. Killed nodes don't pin (their evidence is free to compress)."""
+    gpath = corpus_path.parent / "graph.db"
+    if not gpath.exists():
+        return frozenset()
+    from . import db
+    refs: set = set()
+    for nd in db.nodes(db.connect(gpath)):
+        if nd.get("status") != "killed":
+            refs.update(str(e) for e in (nd.get("evidence") or []))
+    return frozenset(refs)
+
+
 def _detect_counter(rows):
     full = [t for t in rows if not graph.is_stub(t)]            # evicted stubs carry no grid to mask
     return graph.detect_counter([full[0]["before"]] + [t["after"] for t in full]) if full else frozenset()
@@ -192,9 +209,12 @@ def pending_report(path, ledger_path) -> str:
     lines = [head]
     for e in pend:
         coord = f" ({e['x']},{e['y']})" if e["x"] is not None else ""
-        d = graph.transition_diff(rows[e["idx"]]["before"], rows[e["idx"]]["after"])
-        lines.append(f"  [{e['idx']}] {e['before']} --{e['action']}{coord}--> "
-                     f"{e['after']} : {d.describe(max_cells=4)}")
+        row = rows[e["idx"]]
+        # A pending (un-consolidated) edge shouldn't be evicted today, but guard the invariant so a
+        # stubbed row can never crash the admission report.
+        delta = "(evicted; replay to regenerate)" if graph.is_stub(row) else \
+            graph.transition_diff(row["before"], row["after"]).describe(max_cells=4)
+        lines.append(f"  [{e['idx']}] {e['before']} --{e['action']}{coord}--> {e['after']} : {delta}")
     return "\n".join(lines)
 
 
@@ -231,21 +251,26 @@ def evict(path, ledger_path, dry_run: bool) -> str:
     LOG and the content identity survive — only the renderable grid goes, and it's regenerable via
     replay (or simmer, where the rule models it). Loose by design: a wrong evict costs a re-derive,
     not corruption (the deterministic action log is the backstop). Un-spent episodes keep their
-    grids. `--dry-run` reports without rewriting."""
+    grids; so do PINNED ones — a transition cited as evidence by a live/open dagger node keeps its
+    grid, so every standing claim stays replayable/auditable (the spent != evict-safe split).
+    `--dry-run` reports without rewriting."""
     import json
     rows = _rows(path)
     if not rows:
         return "(empty corpus — nothing to evict)"
     counter = _counter(path, rows)
     spent = _spent_keys(ledger_path)
-    out, n, saved = [], 0, 0
-    for t in rows:
+    pinned = _pinned_evidence(path)
+    out, n, saved, kept = [], 0, 0, 0
+    for i, t in enumerate(rows):
         if graph.is_stub(t):
             out.append(t)
             continue
         hb = graph.state_hash(t["before"], counter)
         ha = graph.state_hash(t["after"], counter)
-        if graph.edge_key(hb, t["action"], t.get("x"), t.get("y"), ha) in spent:
+        is_spent = graph.edge_key(hb, t["action"], t.get("x"), t.get("y"), ha) in spent
+        is_pinned = str(i) in pinned or hb in pinned or ha in pinned   # cited by a standing claim
+        if is_spent and not is_pinned:
             stub = {"action": t["action"], "x": t.get("x"), "y": t.get("y"),
                     "before": hb, "after": ha, "evicted": True}
             if t.get("spent") is not None:                      # keep piper's BUDGET stamp (audit/replay)
@@ -254,13 +279,16 @@ def evict(path, ledger_path, dry_run: bool) -> str:
             out.append(stub)
             n += 1
         else:
-            out.append(t)                                       # un-spent: keep the full grid
+            out.append(t)                                       # un-spent OR pinned: keep the full grid
+            if is_spent:
+                kept += 1
     if not dry_run and n:
         graph.save_counter(path, counter)                      # PIN the mask so stubs + future rows stay consistent
         path.write_text("".join(json.dumps(r) + "\n" for r in out))
     verb = "would evict" if dry_run else "evicted"
+    pin = f"; pinned {kept} (cited by a standing node)" if kept else ""
     return (f"{verb} {n} consolidated episode(s)' grids (~{saved} bytes reclaimed); "
-            f"action log + hashes + budget stamps kept")
+            f"action log + hashes + budget stamps kept{pin}")
 
 
 _CONTRACT = """\

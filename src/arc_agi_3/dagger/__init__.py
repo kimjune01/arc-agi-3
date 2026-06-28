@@ -18,6 +18,7 @@ from .dag import (
     Hole,
     Node,
     actionable,
+    closure,
     confidence,
     connect,
     decompose,
@@ -33,6 +34,6 @@ from .dag import (
 
 __all__ = [
     "WIN", "WIN_ANCHOR", "DEPOSIT_ANCHOR", "DEPOSIT_POST", "FREE", "PAID", "COMMITTED", "Hole", "Node",
-    "actionable", "confidence", "connect", "decompose", "entails", "get", "init", "live",
+    "actionable", "closure", "confidence", "connect", "decompose", "entails", "get", "init", "live",
     "merge", "plan", "put", "render",
 ]

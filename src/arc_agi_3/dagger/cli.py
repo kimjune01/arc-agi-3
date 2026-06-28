@@ -36,6 +36,7 @@ forced verdict is worse than a deferred one.
 
   render                 the whole graph as markdown (read it first)
   plan <goal>            a cached decomposition (HIT) or a HOLE to abduce (miss)
+  closure [goal]        is the goal wired down to primitives? reports the holes (why exploit can't fire)
   get <ref>             resolve a dagger:<anchor> ref to a node
   decompose ...         write/promote a node  (see `dagger decompose --help` — the discipline)
   init <action>...      seed apex win-game + one leaf per action
@@ -70,6 +71,8 @@ def main() -> None:
     g.add_argument("ref")
     pl = sub.add_parser("plan", help="cached decomposition (HIT) or a HOLE (miss)")
     pl.add_argument("goal")
+    cl = sub.add_parser("closure", help="is the goal wired down to primitives? report the holes")
+    cl.add_argument("goal", nargs="?", default=dag.WIN)
     d = sub.add_parser("decompose", help="write/promote a node consolidated from episodes",
                        epilog=_DECOMPOSE_EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter)
     d.add_argument("anchor")
@@ -103,6 +106,14 @@ def main() -> None:
             print(f"HOLE: no decomposition for {args.goal!r} — abduce one with `dagger decompose`")
         else:
             print(f"HIT\n{_fmt(r)}")
+    elif args.cmd == "closure":
+        c = dag.closure(conn, args.goal)
+        if c["resolved"]:
+            print(f"CLOSED: {args.goal!r} resolves to runnable primitives (no holes)")
+        else:
+            print(f"OPEN: {args.goal!r} has {len(c['holes'])} hole(s) — exploit can't fire until wired:")
+            for h in c["holes"]:
+                print(f"  - {h}")
     elif args.cmd == "decompose":
         evidence = [e.strip() for e in args.evidence.split(",") if e.strip()]
         try:

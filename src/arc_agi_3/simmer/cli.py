@@ -17,6 +17,7 @@ import json
 
 import numpy as np
 
+from ..jotter.graph import is_stub
 from ..perception import diff_grids, render_grid
 from ..session import STATE_DIR
 from .engine import step
@@ -33,8 +34,14 @@ def _load(path) -> list[dict]:
 
 def test(path) -> str:
     trans = _load(path)
-    lines, npass = [], 0
+    lines, npass, nskip = [], 0, 0
     for i, t in enumerate(trans):
+        if is_stub(t):
+            # An EVICTED transition: the sleep-prune compressed its grids to hashes, so there is
+            # nothing to replay. Skip it (don't crash, don't score it) — replay needs the full grid.
+            nskip += 1
+            lines.append(f"  [{i}] {t['action']:8} – evicted (grids compressed away)")
+            continue
         before = np.asarray(t["before"], np.int16)
         after = np.asarray(t["after"], np.int16)
         pred = np.asarray(step(before, t["action"], t.get("x"), t.get("y")), np.int16)
@@ -44,7 +51,10 @@ def test(path) -> str:
             lines.append(f"  [{i}] {t['action']:8} ✓")
         else:
             lines.append(f"  [{i}] {t['action']:8} ✗ {d.describe(max_cells=6)}")
-    head = f"simmer test: {npass}/{len(trans)} transitions reproduced  ({path})"
+    nfull = len(trans) - nskip
+    head = f"simmer test: {npass}/{nfull} replayable transitions reproduced  ({path})"
+    if nskip:
+        head += f"  [{nskip} evicted, skipped]"
     return head + ("\n" + "\n".join(lines) if lines else "")
 
 
@@ -53,6 +63,9 @@ def step_cmd(path, index: int, no_grid: bool) -> str:
     if not 0 <= index < len(trans):
         raise SystemExit(f"simmer: index {index} out of range (0-{len(trans)-1})")
     t = trans[index]
+    if is_stub(t):
+        raise SystemExit(f"simmer: transition {index} was evicted (grids compressed to hashes) — "
+                         f"nothing to replay. Pick a full (un-evicted) transition.")
     before = np.asarray(t["before"], np.int16)
     after = np.asarray(t["after"], np.int16)
     pred = np.asarray(step(before, t["action"], t.get("x"), t.get("y")), np.int16)

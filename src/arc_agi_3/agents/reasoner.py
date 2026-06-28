@@ -236,8 +236,13 @@ def main() -> None:
         print("\n=== durable notes (after remediation) ===")
         print(notes.read_text().strip() or "(empty)")
     from .. import dagger
+    conn = dagger.connect()
     print("\n=== plan graph (what the sleep pass consolidated) ===")
-    print(dagger.render(dagger.connect()))
+    print(dagger.render(conn))
+    c = dagger.closure(conn)
+    print("\n=== plan closure (is the win path wired to primitives?) ===")
+    print("CLOSED — resolves to runnable primitives" if c["resolved"]
+          else f"OPEN — {len(c['holes'])} hole(s): {', '.join(c['holes'])}  (exploit can't fire until wired)")
 
 
 if __name__ == "__main__":

@@ -184,3 +184,27 @@ def test_actionable_is_a_stakes_threshold_not_a_tier():
     assert dg.actionable(witnessed, dg.PAID)                  # one witness clears a paid action
     assert not dg.actionable(witnessed, dg.COMMITTED)         # ...but not a long committed route
     assert not dg.actionable(killed, dg.FREE)                 # killed is never actionable, any stakes
+
+
+# --- closure: is the goal wired down to primitives? (pure structure, no game priors) -------------
+def test_closure_reports_the_unwired_rung_then_closes():
+    c = _conn()
+    dg.init(c, ["ACTION1"])
+    # fresh init: apex -> deposit-one-point (a HOLE, unauthored) -> the recipe rung is missing
+    r = dg.closure(c)
+    assert not r["resolved"] and r["holes"] == [dg.DEPOSIT_ANCHOR]   # exactly why exploit can't fire
+    # author the recipe rung down to a runnable primitive -> the path closes
+    dg.decompose(c, dg.DEPOSIT_ANCHOR, dg.DEPOSIT_POST, ["ACTION1"], "sequence")
+    r2 = dg.closure(c)
+    assert r2["resolved"] and r2["holes"] == []
+
+
+def test_closure_flags_a_killed_rung_as_a_dead_end():
+    c = _conn()
+    dg.init(c, ["ACTION1", "ACTION2"])
+    # deposit decomposes into a child that gets killed -> the path through it is a dead end
+    dg.decompose(c, dg.DEPOSIT_ANCHOR, dg.DEPOSIT_POST, ["sub"], "sequence")
+    dg.decompose(c, "sub", "do the thing", ["ACTION1", "ACTION2"], "sequence",
+                 status="killed", evidence=["0", "1"])
+    r = dg.closure(c)
+    assert not r["resolved"] and "sub (killed)" in r["holes"]

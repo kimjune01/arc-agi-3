@@ -43,6 +43,22 @@ def test_test_harness_counts_reproduced(tmp_path):
         + json.dumps({"action": "ACTION1", "before": g.tolist(), "after": changed.tolist()}) + "\n"
     )
     report = cli.test(corpus)
-    assert "1/2 transitions reproduced" in report
+    assert "1/2 replayable transitions reproduced" in report
     assert "[0] ACTION1" in report and "✓" in report
     assert "✗" in report   # the changing transition is missed (identity can't model it yet)
+
+
+def test_test_harness_skips_evicted_stubs(tmp_path):
+    # An evicted (sleep-pruned) transition stores hashes, not grids — there is nothing to replay.
+    # `simmer test` must SKIP it, not crash on np.asarray("<hash>", int16). Regression: the live
+    # drive's cost-class validation died here because the whole corpus had been evicted to stubs.
+    g = _scene()
+    corpus = tmp_path / "transitions.jsonl"
+    corpus.write_text(
+        json.dumps({"action": "ACTION1", "before": g.tolist(), "after": g.tolist()}) + "\n"
+        + json.dumps({"action": "ACTION2", "before": "4b72de2be6", "after": "9af01c33d2"}) + "\n"
+    )
+    report = cli.test(corpus)                       # no ValueError
+    assert "1/1 replayable transitions reproduced" in report   # the stub is not counted in the denom
+    assert "1 evicted, skipped" in report
+    assert "evicted (grids compressed away)" in report

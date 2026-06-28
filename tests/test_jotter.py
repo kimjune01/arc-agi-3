@@ -77,6 +77,45 @@ def test_evict_compresses_spent_episodes_keeping_the_action_log(tmp_path):
     assert "1 of 2" in cli.pending_report(corpus, ledger)          # eviction doesn't disturb pending
 
 
+def test_effects_and_diffs_skip_evicted_stubs():
+    """Defensive: the graph functions must not crash on an evicted row (a hash-stub has no grid).
+    Same crash class as the simmer-test fix. They skip stubs and keep the full rows' original index."""
+    from arc_agi_3.jotter.graph import diffs, effects
+    A, B = _g(1), _g(2)
+    stub = {"action": "ACTION2", "x": None, "y": None, "before": "deadbeef01", "after": "feed0bba11",
+            "evicted": True}
+    rows = [_t(A, "ACTION1", B), stub]
+    eff = effects(rows)                                  # no ValueError on np.asarray("deadbeef01")
+    assert "ACTION1" in eff and "ACTION2" not in eff     # the stub is skipped
+    assert [d[0] for d in diffs(rows)] == [0]            # only the full row, original index preserved
+
+
+def test_evict_pins_grids_cited_by_a_standing_node(tmp_path):
+    """Retention fix: a spent transition cited as EVIDENCE by a non-killed dagger node keeps its grid,
+    so every standing claim stays replayable/auditable. 'spent' (consolidated) != 'safe to destroy as
+    evidence'. A killed node does NOT pin — its evidence is free to compress."""
+    import json
+
+    from arc_agi_3.jotter import cli, db, graph
+    A, B, C = _g(1), _g(2), _g(3)
+    corpus = tmp_path / "transitions.jsonl"
+    corpus.write_text("".join(json.dumps(t) + "\n" for t in [_t(A, "ACTION1", B), _t(B, "ACTION2", C)]))
+    ledger = cli._ledger(corpus)
+    # a live node cites episode 0; a killed node cites episode 1 (killed -> does not pin)
+    g = db.connect(tmp_path / "graph.db")
+    db.put(g, {"anchor": "live-skill", "kind": "compound", "children": ["ACTION1"], "mode": "sequence",
+               "post": "p", "status": "live", "evidence": ["0"]})
+    db.put(g, {"anchor": "dead", "kind": "compound", "children": ["ACTION2"], "mode": "sequence",
+               "post": "q", "status": "killed", "evidence": ["1"]})
+
+    cli.spend(corpus, ledger, [0, 1], "node")                      # both consolidated
+    report = cli.evict(corpus, ledger, dry_run=False)
+    after = [json.loads(l) for l in corpus.read_text().splitlines()]
+    assert not graph.is_stub(after[0])                            # episode 0 PINNED (cited by live node)
+    assert graph.is_stub(after[1])                                # episode 1 evicted (only a killed node cites it)
+    assert "evicted 1" in report and "pinned 1" in report
+
+
 def test_evict_preserves_identity_hashes(tmp_path):
     """Regression: re-detecting the counter from a shrunk row set shifted the hash mask and silently
     corrupted dedup. The PINNED counter keeps the trace's content-hashes identical across eviction."""
