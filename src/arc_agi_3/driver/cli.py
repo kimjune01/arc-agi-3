@@ -24,8 +24,9 @@ def main() -> None:
 
     result = run(args.game, goal=args.goal, budget=args.budget, max_steps=args.max_steps)
     for e in result["log"]:
-        print(f"{e['step']:3} {e['action']:8} plan={e['plan']:5} sim_move={int(e['sim_move'])} "
-              f"surprise={int(e['surprise'])} score={e['score']} spent={e['spent']}")
+        print(f"{e['step']:3} {e['action']:8} {e['mode']:7} plan={e['plan']:5} "
+              f"sim_move={int(e['sim_move'])} surprise={int(e['surprise'])} "
+              f"score={e['score']} spent={e['spent']}")
     s = result["summary"]
     print(f"--- {s['steps']} steps | {s['spent']} spent | score {s['score']} | "
           f"{s['surprises']} surprises | {s['state']}")

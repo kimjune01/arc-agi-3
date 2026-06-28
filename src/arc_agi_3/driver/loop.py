@@ -58,26 +58,61 @@ def _toward_frontier(edges: dict, cur: str, has_untried) -> str | None:
     return None
 
 
-def decide(sess, counts: dict, *, corpus=None) -> tuple[str, bool]:
-    """Pick the next paid action. Policy: among actions simmer predicts will move the avatar on the
-    COUNTER-MASKED state (so the move-counter ticking alone doesn't read as a move — the confound
-    that made an earlier version loop), prefer one predicted to reach a NOVEL masked state, then
-    least-used, then name. Returns (action, simmer_had_a_real_move). simmer may be wrong — the
-    postgate surprise catches that and records it, so the policy self-corrects as the corpus grows.
+def _next_primitive(conn, node, avail, counts, _seen=None):
+    """Descend a goal-decomposition to the first RUNNABLE primitive action (an available action
+    leaf), least-used among ties — a minimal route-follower for the exploit path. Returns the
+    action token or None (the plan resolves to nothing runnable yet → fall back to exploring)."""
+    _seen = _seen or set()
+    if node is None or node.anchor in _seen:
+        return None
+    _seen.add(node.anchor)
+    if node.is_leaf:
+        return node.action if node.action in avail else None
+    runnable = []
+    for child in node.children:
+        a = _next_primitive(conn, dagger.get(conn, child), avail, counts, _seen)
+        if a:
+            runnable.append(a)
+    return min(runnable, key=lambda a: (counts.get(a, 0), a)) if runnable else None
 
-    TODO: when dagger.plan returns a real decomposition (not a Hole) and arbor names live
-    hypotheses, decide should spend piper where the free rollout is untrustworthy along the PLAN,
-    not just toward novelty. This is the exploration floor.
+
+def decide(sess, counts: dict, *, conn=None, goal: str = dagger.WIN, corpus=None) -> tuple[str, dict]:
+    """Pick the next paid action and say WHY (the `info` dict: mode, and the node when exploiting).
+
+    EXPLOIT vs EXPLORE is the pragmatist gate (belief-is-the-edge-of-knowing): committing a route is
+    high-stakes, so the driver follows a goal-plan ONLY when it is `actionable` at COMMITTED stakes
+    (witnessed enough) — a freshly-abduced, under-witnessed win-recipe is NOT blindly followed; the
+    agent keeps EXPLORING (witnessing) until the recipe accrues confidence. Knowledge is derived at
+    the decision, indexed by what's at risk; it is not a property the plan has merely by existing.
+
+    EXPLORE policy (the floor, when no plan clears the bar): among actions simmer predicts will move
+    the avatar on the COUNTER-MASKED state (so the counter ticking alone isn't read as a move),
+    prefer one predicted to reach a NOVEL masked state, then least-used, then name. simmer may be
+    wrong — the postgate surprise catches it and records it, so the policy self-corrects.
     """
     before = np.asarray(sess.grid, np.int16)
-    # ACTION6 (click) needs a coordinate target we don't choose yet — skip it in the skeleton.
-    avail = [a for a in (sess.available_actions or _DEFAULT_ACTIONS) if a != "ACTION6"]
+    avail0 = [a for a in (sess.available_actions or _DEFAULT_ACTIONS) if a != "ACTION6"]
+
+    # EXPLOIT: a goal-plan that is witnessed enough to commit at COMMITTED stakes (the high-stakes
+    # threshold for a route). Below the bar, fall through to EXPLORE — the spend that earns witnesses.
+    if conn is not None:
+        plan = dagger.plan(conn, goal)
+        if isinstance(plan, dagger.Node) and dagger.actionable(plan, dagger.COMMITTED):
+            a = _next_primitive(conn, plan, avail0, counts)
+            if a is not None:
+                return a, {"mode": "exploit", "node": plan.anchor, "sim_move": True}
+    # EXPLORE (no plan cleared the bar): probe to witness. ACTION6 (click) needs a coordinate
+    # target we don't choose yet — skip it in the skeleton.
+    avail = avail0
     m = load_corpus(corpus or CORPUS)          # EpMem: detected move-counter + known masked states
     counter = m.counter
     here = state_hash(before, counter)
 
     def has_untried(h: str) -> bool:
         return any((h, a, None, None) not in m.edges for a in avail)
+
+    def explore(action, sim_move):
+        return action, {"mode": "explore", "node": None, "sim_move": sim_move}
 
     # 1) Untried actions from HERE — expand the current state before wandering off.
     untried = [a for a in avail if (here, a, None, None) not in m.edges]
@@ -90,15 +125,15 @@ def decide(sess, counts: dict, *, corpus=None) -> tuple[str, bool]:
             if h == here:
                 return (3, counts.get(a, 0), a)               # predicted wall: try last
             return (1 if h not in m.states else 2, counts.get(a, 0), a)  # prefer predicted-novel
-        return min(untried, key=rank), True
+        return explore(min(untried, key=rank), True)
 
     # 2) HERE is fully expanded — walk toward the nearest state that still has an untried action.
     nxt = _toward_frontier(m.edges, here, has_untried)
     if nxt is not None:
-        return nxt, True
+        return explore(nxt, True)
 
     # 3) Reachable graph exhausted under this action set — least-used fallback.
-    return min(avail, key=lambda a: (counts.get(a, 0), a)), False
+    return explore(min(avail, key=lambda a: (counts.get(a, 0), a)), False)
 
 
 def run(game: str, *, goal: str = "win game", budget: int = 25,
@@ -125,7 +160,7 @@ def run(game: str, *, goal: str = "win game", budget: int = 25,
                 break
 
             plan = dagger.plan(conn, goal)             # JIT: Holes early (no decomposition yet)
-            action, sim_move = decide(sess, counts)
+            action, info = decide(sess, counts, conn=conn, goal=goal)   # exploit if actionable, else explore
             before = np.asarray(sess.grid, np.int16)
             pred = _predict(before, action)
             ref = f"dagger:{action}"                    # the real leaf, seeded by init()
@@ -142,7 +177,8 @@ def run(game: str, *, goal: str = "win game", budget: int = 25,
             log.append({
                 "step": len(log) + 1, "action": action,
                 "plan": type(plan).__name__,            # 'Hole' until a decomposition is cached
-                "sim_move": sim_move, "surprise": bool(verdict.get("surprise")),
+                "mode": info["mode"],                   # 'exploit' (followed an actionable plan) | 'explore'
+                "sim_move": info.get("sim_move", False), "surprise": bool(verdict.get("surprise")),
                 "score": sess.score, "spent": sess.actions_spent,
             })
     finally:

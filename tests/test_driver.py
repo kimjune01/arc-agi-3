@@ -65,5 +65,36 @@ def test_run_drives_through_the_gated_path(game):
 def test_decide_returns_a_real_available_action(game):
     l0.start("fake")
     sess = store.load()
-    action, _ = driver.decide(sess, counts={})
+    action, info = driver.decide(sess, counts={})
     assert action in sess.available_actions            # the shared surface, importable
+    assert info["mode"] == "explore"                   # no plan, no conn → the exploration floor
+
+
+def test_decide_exploits_a_goal_plan_witnessed_enough_to_commit(game):
+    """The pragmatist gate, wired: a win-recipe witnessed ×2 clears COMMITTED stakes, so the driver
+    follows it (exploit) instead of exploring — and resolves its primitive next action."""
+    from arc_agi_3 import dagger as dg
+    l0.start("fake")
+    sess = store.load()
+    conn = db.connect(":memory:")
+    dg.init(conn, ["ACTION1", "ACTION2", "ACTION3", "ACTION4"])
+    dg.decompose(conn, "win-recipe", dg.WIN, ["ACTION1"], "sequence", status="open",
+                 evidence=["0", "1"])                  # witnessed×2 → actionable at COMMITTED
+    action, info = driver.decide(sess, counts={}, conn=conn, goal=dg.WIN)
+    assert info["mode"] == "exploit" and info["node"] == "win-recipe"
+    assert action == "ACTION1"
+
+
+def test_decide_will_not_commit_an_under_witnessed_plan(game):
+    """The same recipe witnessed only ×1 does NOT clear COMMITTED stakes — the driver keeps
+    EXPLORING (witnessing) rather than blindly following an under-confident route."""
+    from arc_agi_3 import dagger as dg
+    l0.start("fake")
+    sess = store.load()
+    conn = db.connect(":memory:")
+    dg.init(conn, ["ACTION1", "ACTION2", "ACTION3", "ACTION4"])
+    dg.decompose(conn, "win-recipe", dg.WIN, ["ACTION1"], "sequence", status="open",
+                 evidence=["0"])                       # only ×1 < COMMITTED threshold
+    action, info = driver.decide(sess, counts={}, conn=conn, goal=dg.WIN)
+    assert info["mode"] == "explore"
+    assert action in sess.available_actions

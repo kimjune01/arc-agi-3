@@ -1045,3 +1045,21 @@ will call it when deciding whether to commit — that's where the stakes-indexed
 where the uberty→security flow cashes out (a high-stakes plan pulls a node toward more witnesses
 before committing). 2 unit tests (confidence = witness count / killed→0; actionable as a stakes
 threshold, not a tier). Full suite 85.
+
+## 2026-06-28 — wire actionable() into the driver: stakes-gated exploit vs explore
+
+The pragmatist gate now has a real caller. `decide` consults `dagger.plan(goal)` and follows it
+ONLY when it is `actionable` at COMMITTED stakes (witnessed enough to commit a route); otherwise it
+EXPLORES (the existing floor). So a freshly-abduced, under-witnessed win-recipe is NOT blindly
+followed — the agent keeps witnessing until the recipe accrues confidence. Knowledge is derived at
+the decision, indexed by what's at risk; a plan isn't actionable merely by existing.
+
+- `decide(sess, counts, *, conn, goal)` returns `(action, info)` with `info["mode"]` ∈
+  {exploit, explore} (+ the node when exploiting); `_next_primitive` descends a goal-decomposition
+  to the first runnable primitive action (a minimal route-follower for the exploit path).
+- `run` passes conn+goal and logs `mode`; the `drive` CLI shows it.
+- Validated 3 ways: unit exploit (a win-recipe witnessed×2 → followed), unit explore (×1 → not
+  committed, keeps exploring), and a live coded drive on LS20 (8 steps, all `explore` — no recipe
+  yet, plan=Hole, 0 surprises, clean). The exploit path activates once a witnessed win-recipe exists.
+
+2 driver unit tests. Full suite 87.
